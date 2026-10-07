@@ -1,0 +1,8 @@
+{
+  "name": "Remix Wong Arjawinangun - Aplikasi Mobile Warga",
+  "description": "Wireframe interaktif dan purwarupa aplikasi mobile Wong Arjawinangun: ojek \u0026 becak lokal, belanja pasar tradisional, jasa tukang, kuliner, info desa, dan forum komunitas.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
