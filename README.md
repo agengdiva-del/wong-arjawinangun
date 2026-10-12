@@ -1,6 +1,6 @@
 # Wong Arjawinangun
 
-Aplikasi Wong Arjawinangun adalah perangkat lunak yang dikembangkan untuk [tujuan aplikasi kamu, misalnya: informasi budaya, layanan komunitas, dll].
+Aplikasi Wong Arjawinangun adalah perangkat lunak yang dikembangkan untuk informasi dan layanan komunitas Masyarakat Arjawinangun dan sekitarnya, aplikasi dalam tahap uji coba semoga kedepannya apa yang menjadi kebutuhan Masyarakat Arjawinangun dan sekitarnya bisa terpenuhi
 
 ## Hak Cipta
 
@@ -12,3 +12,4 @@ Dilarang memperbanyak, mendistribusikan, atau memodifikasi sebagian maupun selur
 ## Lisensi
 
 All rights reserved
+by Ombi & Didin Frangklin
