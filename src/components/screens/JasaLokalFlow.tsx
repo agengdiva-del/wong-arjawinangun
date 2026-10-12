@@ -124,8 +124,18 @@ export const JasaLokalFlow: React.FC<JasaLokalFlowProps> = ({
             </span>
             <span className="text-[10px] text-slate-500">Siaga Panggilan</span>
           </div>
-
-          {filteredServices.map((worker) => {
+          {filteredServices.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-8 text-center space-y-2">
+              <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
+                <Wrench size={24} />
+              </div>
+              <h4 className="text-xs font-bold text-slate-800">Belum Ada Tukang Terdaftar</h4>
+              <p className="text-[11px] text-slate-500 max-w-xs mx-auto">
+                Warga desa dengan keahlian pertukangan atau teknisi dapat mendaftar langsung melalui balai desa Arjawinangun.
+              </p>
+            </div>
+          ) : (
+            filteredServices.map((worker) => {
             const isFav = favorites[worker.id];
             return (
               <div
@@ -234,7 +244,7 @@ export const JasaLokalFlow: React.FC<JasaLokalFlowProps> = ({
                 </div>
               </div>
             );
-          })}
+          }))}
         </div>
       </div>
 

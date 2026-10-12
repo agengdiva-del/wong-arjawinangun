@@ -27,7 +27,7 @@ export const AdminPortalLoginScreen: React.FC<AdminPortalLoginScreenProps> = ({
   isWireframe = false,
 }) => {
   const [selectedAdmin, setSelectedAdmin] = useState<'super_admin' | 'admin'>('super_admin');
-  const [pinCode, setPinCode] = useState('1234');
+  const [pinCode, setPinCode] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleLogin = (role: 'super_admin' | 'admin') => {
@@ -171,38 +171,27 @@ export const AdminPortalLoginScreen: React.FC<AdminPortalLoginScreenProps> = ({
           </div>
         </div>
 
-        {/* PIN Security Field (Pre-filled for fast testing) */}
-        <div className="p-3 bg-slate-900/90 rounded-2xl border border-slate-800 text-left space-y-2">
-          <div className="flex items-center justify-between">
-            <label className="text-[10px] font-bold text-slate-300 flex items-center gap-1">
+        {/* PIN Security Field */}
+        <div className="p-3.5 bg-slate-900/90 rounded-2xl border border-slate-800 text-left space-y-2">
+          <label className="text-[10px] font-bold text-slate-300 flex items-center justify-between">
+            <span className="flex items-center gap-1">
               <KeyRound size={12} className="text-amber-400" />
               <span>PIN Keamanan Petugas:</span>
-            </label>
-            <span className="text-[9px] font-mono text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-500/30">
-              PIN Default: 1234
             </span>
-          </div>
+            <span className="text-[9px] text-slate-400">Minimal 4 digit</span>
+          </label>
 
-          <div className="flex items-center gap-2">
-            <input
-              type="password"
-              value={pinCode}
-              onChange={(e) => {
-                setPinCode(e.target.value);
-                setErrorMessage(null);
-              }}
-              placeholder="••••"
-              maxLength={6}
-              className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-sm font-mono tracking-widest text-center text-white focus:outline-none focus:border-purple-400"
-            />
-            <button
-              type="button"
-              onClick={() => setPinCode('1234')}
-              className="px-2.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-[10px] font-bold shrink-0 transition-colors"
-            >
-              Isi 1234
-            </button>
-          </div>
+          <input
+            type="password"
+            value={pinCode}
+            onChange={(e) => {
+              setPinCode(e.target.value);
+              setErrorMessage(null);
+            }}
+            placeholder="Masukkan 4-digit PIN"
+            maxLength={6}
+            className="w-full px-3 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm font-mono tracking-widest text-center text-white focus:outline-none focus:border-purple-400"
+          />
 
           {errorMessage && (
             <p className="text-[10px] text-rose-400 font-semibold">{errorMessage}</p>

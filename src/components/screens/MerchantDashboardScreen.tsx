@@ -36,11 +36,11 @@ export const MerchantDashboardScreen: React.FC<MerchantDashboardScreenProps> = (
 }) => {
   const [activeTab, setActiveTab] = useState<'pesanan' | 'katalog' | 'keuangan' | 'laporan'>('pesanan');
   const [isStoreOpen, setIsStoreOpen] = useState(true);
-  const [walletBalance, setWalletBalance] = useState(680000);
+  const [walletBalance, setWalletBalance] = useState(0);
   const [orders, setOrders] = useState<MerchantOrder[]>(MOCK_MERCHANT_ORDERS);
   
   // Store products list
-  const [products, setProducts] = useState<ProductItem[]>(MARKET_VENDORS[0].products);
+  const [products, setProducts] = useState<ProductItem[]>([]);
 
   // Modals
   const [showAddProductModal, setShowAddProductModal] = useState(false);
@@ -168,12 +168,16 @@ export const MerchantDashboardScreen: React.FC<MerchantDashboardScreenProps> = (
         {/* Merchant Key Figures */}
         <div className="grid grid-cols-3 gap-2">
           <div className="p-2.5 bg-white rounded-xl border border-slate-200 shadow-2xs">
-            <span className="text-[10px] text-slate-500 font-semibold block">Omset Hari Ini</span>
+            <span className="text-[10px] text-slate-500 font-semibold block">Omset Toko</span>
             <div className="flex items-center gap-1 mt-0.5">
               <TrendingUp size={14} className="text-emerald-600" />
-              <span className="text-xs font-black text-slate-900">Rp 425.000</span>
+              <span className="text-xs font-black text-slate-900 truncate">
+                Rp {orders.filter((o) => o.status === 'Selesai').reduce((sum, o) => sum + o.total, 0).toLocaleString('id-ID')}
+              </span>
             </div>
-            <span className="text-[9px] text-slate-400">14 Transaksi</span>
+            <span className="text-[9px] text-slate-400">
+              {orders.filter((o) => o.status === 'Selesai').length} Transaksi
+            </span>
           </div>
 
           <div className="p-2.5 bg-white rounded-xl border border-slate-200 shadow-2xs">
@@ -191,7 +195,9 @@ export const MerchantDashboardScreen: React.FC<MerchantDashboardScreenProps> = (
             <span className="text-[10px] text-slate-500 font-semibold block">Saldo Siap Cair</span>
             <div className="flex items-center gap-1 mt-0.5">
               <Wallet size={14} className="text-amber-600" />
-              <span className="text-xs font-black text-amber-800">Rp 680.000</span>
+              <span className="text-xs font-black text-amber-800 truncate">
+                Rp {walletBalance.toLocaleString('id-ID')}
+              </span>
             </div>
             <button
               onClick={() => setShowWithdrawModal(true)}
@@ -247,92 +253,104 @@ export const MerchantDashboardScreen: React.FC<MerchantDashboardScreenProps> = (
             </div>
 
             <div className="space-y-2.5">
-              {orders.map((ord) => (
-                <div key={ord.id} className="bg-white p-3 rounded-2xl border border-slate-200/90 shadow-2xs space-y-2 text-xs">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-extrabold text-slate-900">{ord.customerName}</span>
-                        <span className="text-[9px] bg-emerald-50 text-emerald-700 px-1.5 py-0.2 rounded font-semibold">
-                          {ord.courierType}
-                        </span>
-                      </div>
-                      <p className="text-[10px] text-slate-400 mt-0.5">
-                        {ord.orderTime} · Antar ke: {ord.deliveryAddress}
-                      </p>
-                    </div>
-
-                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
-                      ord.status === 'Menunggu'
-                        ? 'bg-amber-100 text-amber-800 animate-pulse'
-                        : ord.status === 'Disiapkan'
-                        ? 'bg-blue-100 text-blue-800'
-                        : ord.status === 'Siap Diambil Kurir'
-                        ? 'bg-purple-100 text-purple-800'
-                        : 'bg-emerald-100 text-emerald-800'
-                    }`}>
-                      {ord.status}
-                    </span>
+              {orders.length === 0 ? (
+                <div className="bg-white p-8 rounded-2xl border border-dashed border-slate-200 text-center space-y-2">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center mx-auto">
+                    <Package size={24} />
                   </div>
-
-                  {/* Item List */}
-                  <div className="p-2 bg-slate-50 rounded-xl border border-slate-100 space-y-1 text-[11px]">
-                    {ord.items.map((it, idx) => (
-                      <div key={idx} className="flex justify-between text-slate-700">
-                        <span>{it.qty}x {it.name}</span>
-                        <span className="font-mono text-slate-800">Rp {it.price.toLocaleString('id-ID')}</span>
-                      </div>
-                    ))}
-                    <div className="flex justify-between pt-1 border-t border-slate-200 font-bold text-xs text-slate-900">
-                      <span>Total Belanja:</span>
-                      <span className="text-emerald-700">Rp {ord.total.toLocaleString('id-ID')}</span>
-                    </div>
-                  </div>
-
-                  {/* Order Workflow Actions */}
-                  <div className="flex items-center justify-end gap-1.5 pt-1 border-t border-slate-100">
-                    {ord.status === 'Menunggu' && (
-                      <button
-                        type="button"
-                        onClick={() => handleUpdateOrderStatus(ord.id, 'Disiapkan')}
-                        className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1 shadow-xs transition-colors"
-                      >
-                        <Package size={13} />
-                        <span>Mulai Siapkan Belanjaan</span>
-                      </button>
-                    )}
-
-                    {ord.status === 'Disiapkan' && (
-                      <button
-                        type="button"
-                        onClick={() => handleUpdateOrderStatus(ord.id, 'Siap Diambil Kurir')}
-                        className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1 shadow-xs transition-colors"
-                      >
-                        <Bike size={13} />
-                        <span>Panggil Kurir Becak / Ojek Jemput</span>
-                      </button>
-                    )}
-
-                    {ord.status === 'Siap Diambil Kurir' && (
-                      <button
-                        type="button"
-                        onClick={() => handleUpdateOrderStatus(ord.id, 'Selesai')}
-                        className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1 shadow-xs transition-colors"
-                      >
-                        <CheckCircle2 size={13} />
-                        <span>Selesai Diserahkan ke Kurir</span>
-                      </button>
-                    )}
-
-                    {ord.status === 'Selesai' && (
-                      <span className="text-[10px] text-emerald-700 font-semibold flex items-center gap-1">
-                        <CheckCircle2 size={12} />
-                        <span>Transaksi Berhasil</span>
-                      </span>
-                    )}
-                  </div>
+                  <h4 className="text-xs font-bold text-slate-800">Belum Ada Pesanan Masuk</h4>
+                  <p className="text-[11px] text-slate-500 max-w-xs mx-auto">
+                    Pesanan belanja sayur atau sembako dari warga desa akan langsung muncul secara seketika di sini.
+                  </p>
                 </div>
-              ))}
+              ) : (
+                orders.map((ord) => (
+                  <div key={ord.id} className="bg-white p-3 rounded-2xl border border-slate-200/90 shadow-2xs space-y-2 text-xs">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-extrabold text-slate-900">{ord.customerName}</span>
+                          <span className="text-[9px] bg-emerald-50 text-emerald-700 px-1.5 py-0.2 rounded font-semibold">
+                            {ord.courierType}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                          {ord.orderTime} · Antar ke: {ord.deliveryAddress}
+                        </p>
+                      </div>
+
+                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                        ord.status === 'Menunggu'
+                          ? 'bg-amber-100 text-amber-800 animate-pulse'
+                          : ord.status === 'Disiapkan'
+                          ? 'bg-blue-100 text-blue-800'
+                          : ord.status === 'Siap Diambil Kurir'
+                          ? 'bg-purple-100 text-purple-800'
+                          : 'bg-emerald-100 text-emerald-800'
+                      }`}>
+                        {ord.status}
+                      </span>
+                    </div>
+
+                    {/* Item List */}
+                    <div className="p-2 bg-slate-50 rounded-xl border border-slate-100 space-y-1 text-[11px]">
+                      {ord.items.map((it, idx) => (
+                        <div key={idx} className="flex justify-between text-slate-700">
+                          <span>{it.qty}x {it.name}</span>
+                          <span className="font-mono text-slate-800">Rp {it.price.toLocaleString('id-ID')}</span>
+                        </div>
+                      ))}
+                      <div className="flex justify-between pt-1 border-t border-slate-200 font-bold text-xs text-slate-900">
+                        <span>Total Belanja:</span>
+                        <span className="text-emerald-700">Rp {ord.total.toLocaleString('id-ID')}</span>
+                      </div>
+                    </div>
+
+                    {/* Order Workflow Actions */}
+                    <div className="flex items-center justify-end gap-1.5 pt-1 border-t border-slate-100">
+                      {ord.status === 'Menunggu' && (
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateOrderStatus(ord.id, 'Disiapkan')}
+                          className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1 shadow-xs transition-colors"
+                        >
+                          <Package size={13} />
+                          <span>Mulai Siapkan Belanjaan</span>
+                        </button>
+                      )}
+
+                      {ord.status === 'Disiapkan' && (
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateOrderStatus(ord.id, 'Siap Diambil Kurir')}
+                          className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1 shadow-xs transition-colors"
+                        >
+                          <Bike size={13} />
+                          <span>Panggil Kurir Becak / Ojek Jemput</span>
+                        </button>
+                      )}
+
+                      {ord.status === 'Siap Diambil Kurir' && (
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateOrderStatus(ord.id, 'Selesai')}
+                          className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1 shadow-xs transition-colors"
+                        >
+                          <CheckCircle2 size={13} />
+                          <span>Selesai Diserahkan ke Kurir</span>
+                        </button>
+                      )}
+
+                      {ord.status === 'Selesai' && (
+                        <span className="text-[10px] text-emerald-700 font-semibold flex items-center gap-1">
+                          <CheckCircle2 size={12} />
+                          <span>Transaksi Berhasil</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         )}
@@ -355,33 +373,53 @@ export const MerchantDashboardScreen: React.FC<MerchantDashboardScreenProps> = (
             </div>
 
             <div className="space-y-2">
-              {products.map((prod) => (
-                <div key={prod.id} className="bg-white p-3 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-2xl">{prod.image}</span>
-                    <div>
-                      <h4 className="font-bold text-slate-900">{prod.name}</h4>
-                      <p className="text-[11px] text-emerald-700 font-extrabold mt-0.5">
-                        Rp {prod.price.toLocaleString('id-ID')} <span className="text-[10px] font-normal text-slate-500">/ {prod.unit}</span>
-                      </p>
+              {products.length === 0 ? (
+                <div className="bg-white p-8 rounded-2xl border border-dashed border-slate-200 text-center space-y-2">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center mx-auto">
+                    <Store size={24} />
+                  </div>
+                  <h4 className="text-xs font-bold text-slate-800">Katalog Produk Kosong</h4>
+                  <p className="text-[11px] text-slate-500 max-w-xs mx-auto">
+                    Tambahkan barang dagangan, sayur, atau sembako Anda ke katalog kios agar dapat dilihat warga.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddProductModal(true)}
+                    className="mt-2 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1"
+                  >
+                    <PlusCircle size={13} />
+                    <span>+ Tambah Produk Pertama</span>
+                  </button>
+                </div>
+              ) : (
+                products.map((prod) => (
+                  <div key={prod.id} className="bg-white p-3 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-2xl">{prod.image}</span>
+                      <div>
+                        <h4 className="font-bold text-slate-900">{prod.name}</h4>
+                        <p className="text-[11px] text-emerald-700 font-extrabold mt-0.5">
+                          Rp {prod.price.toLocaleString('id-ID')} <span className="text-[10px] font-normal text-slate-500">/ {prod.unit}</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleProductStock(prod.id)}
+                        className={`px-2.5 py-1 rounded-xl text-[10px] font-bold border transition-colors ${
+                          prod.inStock
+                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                            : 'bg-rose-50 text-rose-800 border-rose-200'
+                        }`}
+                      >
+                        {prod.inStock ? 'Stok Tersedia' : 'Stok Habis'}
+                      </button>
                     </div>
                   </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleToggleProductStock(prod.id)}
-                      className={`px-2.5 py-1 rounded-xl text-[10px] font-bold border transition-colors ${
-                        prod.inStock
-                          ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                          : 'bg-rose-50 text-rose-800 border-rose-200'
-                      }`}
-                    >
-                      {prod.inStock ? 'Stok Tersedia' : 'Stok Habis'}
-                    </button>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         )}

@@ -48,47 +48,13 @@ export const SuperAdminDashboardScreen: React.FC<SuperAdminDashboardScreenProps>
   const [baseTarifOjek, setBaseTarifOjek] = useState<number>(8000);
   const [backupStatus, setBackupStatus] = useState<string | null>(null);
   
-  // Interactive user accounts list
+  // Interactive user accounts list (Bersih siap pakai)
   const [userList, setUserList] = useState<UserAccount[]>([
     MOCK_USERS.super_admin,
     MOCK_USERS.admin,
     MOCK_USERS.mitra,
     MOCK_USERS.merchant,
     MOCK_USERS.pelanggan,
-    {
-      id: 'usr-extra-1',
-      name: 'Kang Imron',
-      role: 'mitra',
-      roleTitle: 'Mitra Ojek Motor Cepat',
-      emailOrPhone: '0813-8899-1234',
-      location: 'Depan Stasiun Arjawinangun',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-      status: 'aktif',
-      description: 'Armada ojek Honda Supra X 125, siaga rute stasiun & pasar.',
-      verifiedBadge: 'Terverifikasi Desa',
-      joinedDate: 'Mei 2025',
-      integrityRating: 4.92,
-      serviceRating: 4.88,
-      totalReviewsCount: 38,
-      reputationBadge: 'Mitra Cepat & Ramah',
-    },
-    {
-      id: 'usr-extra-2',
-      name: 'H. Sanusi',
-      role: 'merchant',
-      roleTitle: 'Pemilik Toko Klontong Berkah',
-      emailOrPhone: '0812-9876-5432',
-      location: 'Jl. Ki Bagus Rangin No. 4',
-      avatar: 'https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=150&auto=format&fit=crop&q=80',
-      status: 'aktif',
-      description: 'Pusat sembako grosir & eceran warga Blok Makmur.',
-      verifiedBadge: 'Toko Terdaftar',
-      joinedDate: 'Februari 2025',
-      integrityRating: 4.96,
-      serviceRating: 4.93,
-      totalReviewsCount: 94,
-      reputationBadge: 'Pedagang Berkah Amanah',
-    },
   ]);
 
   // Modal states
@@ -682,21 +648,28 @@ export const SuperAdminDashboardScreen: React.FC<SuperAdminDashboardScreenProps>
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
                 Riwayat Siaran Terkirim
               </span>
-              {broadcastList.map((bc) => (
-                <div key={bc.id} className="p-2.5 bg-slate-800 rounded-xl border border-slate-700 text-xs space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-white">{bc.title}</span>
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-900/60 text-purple-300 font-mono">
-                      {bc.category}
-                    </span>
-                  </div>
-                  <p className="text-[10px] text-slate-300">{bc.content}</p>
-                  <div className="flex items-center justify-between text-[9px] text-slate-500 pt-1 border-t border-slate-700/60">
-                    <span>{bc.sentAt}</span>
-                    <span>Target: {bc.target}</span>
-                  </div>
+              {broadcastList.length === 0 ? (
+                <div className="p-6 bg-slate-800/80 rounded-xl border border-dashed border-slate-700 text-center space-y-1">
+                  <p className="text-xs font-bold text-slate-300">Belum Ada Siaran Terkirim</p>
+                  <p className="text-[10px] text-slate-500">Pemberitahuan darurat atau gotong royong warga akan tercatat di sini.</p>
                 </div>
-              ))}
+              ) : (
+                broadcastList.map((bc) => (
+                  <div key={bc.id} className="p-2.5 bg-slate-800 rounded-xl border border-slate-700 text-xs space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-white">{bc.title}</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-900/60 text-purple-300 font-mono">
+                        {bc.category}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-300">{bc.content}</p>
+                    <div className="flex items-center justify-between text-[9px] text-slate-500 pt-1 border-t border-slate-700/60">
+                      <span>{bc.sentAt}</span>
+                      <span>Target: {bc.target}</span>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         )}
@@ -711,19 +684,26 @@ export const SuperAdminDashboardScreen: React.FC<SuperAdminDashboardScreenProps>
               <span className="text-[9px] text-slate-500">Real-time Cloud Log</span>
             </div>
 
-            {MOCK_AUDIT_LOGS.map((log) => (
-              <div key={log.id} className="p-2.5 bg-slate-800/90 rounded-xl border border-slate-700 space-y-1 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-purple-300">{log.action}</span>
-                  <span className="text-[9px] text-slate-400">{log.timestamp}</span>
-                </div>
-                <p className="text-[11px] text-slate-200">{log.detail}</p>
-                <div className="flex items-center justify-between text-[9px] text-slate-400 pt-1 border-t border-slate-700/50">
-                  <span>Pelaksana: <strong>{log.actor}</strong></span>
-                  <span className="font-mono text-slate-500">{log.id}</span>
-                </div>
+            {MOCK_AUDIT_LOGS.length === 0 ? (
+              <div className="p-6 bg-slate-800/80 rounded-xl border border-dashed border-slate-700 text-center space-y-1">
+                <p className="text-xs font-bold text-slate-300">Log Keamanan Bersih</p>
+                <p className="text-[10px] text-slate-500">Sistem siap mencatat setiap perubahan konfigurasi dan keamanan secara otomatis.</p>
               </div>
-            ))}
+            ) : (
+              MOCK_AUDIT_LOGS.map((log) => (
+                <div key={log.id} className="p-2.5 bg-slate-800/90 rounded-xl border border-slate-700 space-y-1 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-purple-300">{log.action}</span>
+                    <span className="text-[9px] text-slate-400">{log.timestamp}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-200">{log.detail}</p>
+                  <div className="flex items-center justify-between text-[9px] text-slate-400 pt-1 border-t border-slate-700/50">
+                    <span>Pelaksana: <strong>{log.actor}</strong></span>
+                    <span className="font-mono text-slate-500">{log.id}</span>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         )}
       </div>

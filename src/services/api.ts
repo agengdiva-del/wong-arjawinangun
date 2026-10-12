@@ -12,6 +12,7 @@ import {
   VendorReview,
   HallOfFameItem,
   HallOfFameNomination,
+  AppNotification,
 } from '../types';
 import {
   MOCK_USERS,
@@ -27,6 +28,7 @@ import {
   MOCK_TANI_IKAN_VENDORS,
   MOCK_HALL_OF_FAME,
   MOCK_HALL_OF_FAME_NOMINATIONS,
+  MOCK_NOTIFICATIONS,
 } from '../data/mockData';
 
 const BASE_URL = '/api';
@@ -487,5 +489,95 @@ export const api = {
       return { success: true, hasVoted: true };
     }
   },
+
+  async approveHallOfFameNomination(id: string, adminName?: string) {
+    try {
+      const res = await fetch(`${BASE_URL}/hall-of-fame/nomination/${id}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminName }),
+      });
+      return await res.json();
+    } catch (e) {
+      return { success: true };
+    }
+  },
+
+  async publishHallOfFameNomination(id: string, adminName?: string) {
+    try {
+      const res = await fetch(`${BASE_URL}/hall-of-fame/nomination/${id}/publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminName }),
+      });
+      return await res.json();
+    } catch (e) {
+      return { success: true };
+    }
+  },
+
+  async simulateApprovalNotification(nomineeName?: string, category?: string, action?: 'approve' | 'publish') {
+    try {
+      const res = await fetch(`${BASE_URL}/hall-of-fame/nomination/simulate-approval`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nomineeName, category, action }),
+      });
+      return await res.json();
+    } catch (e) {
+      return {
+        success: true,
+        notification: {
+          id: `notif-${Date.now()}`,
+          type: action === 'publish' ? 'hall_of_fame_published' : 'hall_of_fame_approved',
+          title: action === 'publish' ? 'Tokoh Usulan Resmi Dipublikasikan! 🌟' : 'Usulan Tokoh Disetujui Tim Desa! 🏆',
+          message: `Selamat! Usulan Anda untuk "${nomineeName || 'Tokoh Warga'}" telah disetujui.`,
+          timestamp: 'Baru saja',
+          read: false,
+          category: 'Hall of Fame',
+          actionLink: { screen: 'hall_of_fame', label: 'Buka Hall of Fame' },
+        },
+      };
+    }
+  },
+
+  // -----------------------------------------------------------
+  // Pusat Notifikasi
+  // -----------------------------------------------------------
+  async getNotifications() {
+    return safeFetch<{ unreadCount: number; data: AppNotification[] }>(
+      '/notifications',
+      undefined,
+      {
+        unreadCount: MOCK_NOTIFICATIONS.filter((n) => !n.read).length,
+        data: MOCK_NOTIFICATIONS,
+      }
+    );
+  },
+
+  async markNotificationRead(id?: string) {
+    try {
+      const res = await fetch(`${BASE_URL}/notifications/mark-read`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      return await res.json();
+    } catch (e) {
+      return { success: true };
+    }
+  },
+
+  async clearNotifications() {
+    try {
+      const res = await fetch(`${BASE_URL}/notifications/clear`, {
+        method: 'POST',
+      });
+      return await res.json();
+    } catch (e) {
+      return { success: true };
+    }
+  },
 };
+
 

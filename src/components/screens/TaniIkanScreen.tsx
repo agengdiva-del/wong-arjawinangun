@@ -198,61 +198,73 @@ export const TaniIkanScreen: React.FC<TaniIkanScreenProps> = ({
                 </span>
               </div>
 
-              {filteredVendors.map((vendor) => (
-                <div
-                  key={vendor.id}
-                  onClick={() => handleOpenVendor(vendor)}
-                  className="bg-white rounded-2xl border border-slate-200/90 p-3.5 shadow-2xs hover:shadow-xs hover:border-emerald-300 transition-all cursor-pointer group"
-                >
-                  <div className="flex gap-3">
-                    <div className="w-20 h-20 rounded-xl overflow-hidden bg-slate-100 shrink-0">
-                      <img
-                        src={vendor.image}
-                        alt={vendor.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        referrerPolicy="no-referrer"
-                      />
-                    </div>
+              {filteredVendors.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-8 text-center space-y-2">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center mx-auto">
+                    <Sprout size={24} />
+                  </div>
+                  <h4 className="text-xs font-bold text-slate-800">Belum Ada Kios Tani & Tambak Terdaftar</h4>
+                  <p className="text-[11px] text-slate-500 max-w-xs mx-auto">
+                    Kelompok tani, petambak ikan tawar, atau kios pupuk & saprotan di Arjawinangun dapat mendaftarkan usaha mereka melalui balai desa.
+                  </p>
+                </div>
+              ) : (
+                filteredVendors.map((vendor) => (
+                  <div
+                    key={vendor.id}
+                    onClick={() => handleOpenVendor(vendor)}
+                    className="bg-white rounded-2xl border border-slate-200/90 p-3.5 shadow-2xs hover:shadow-xs hover:border-emerald-300 transition-all cursor-pointer group"
+                  >
+                    <div className="flex gap-3">
+                      <div className="w-20 h-20 rounded-xl overflow-hidden bg-slate-100 shrink-0">
+                        <img
+                          src={vendor.image}
+                          alt={vendor.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
 
-                    <div className="flex-1 min-w-0 flex flex-col justify-between">
-                      <div>
-                        <div className="flex items-center justify-between gap-1">
-                          <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-50 px-1.5 py-0.2 rounded">
-                            {vendor.type === 'pertanian' ? 'Pertanian' : vendor.type === 'perikanan' ? 'Tambak Ikan' : 'Sarana Tani'}
-                          </span>
-                          <div className="flex items-center gap-1 text-[11px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.2 rounded-md">
-                            <Star size={11} className="fill-amber-500 text-amber-500" />
-                            <span>{vendor.rating}</span>
-                            <span className="text-slate-400 text-[10px]">({vendor.reviews ? vendor.reviews.length : 3})</span>
+                      <div className="flex-1 min-w-0 flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-50 px-1.5 py-0.2 rounded">
+                              {vendor.type === 'pertanian' ? 'Pertanian' : vendor.type === 'perikanan' ? 'Tambak Ikan' : 'Sarana Tani'}
+                            </span>
+                            <div className="flex items-center gap-1 text-[11px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.2 rounded-md">
+                              <Star size={11} className="fill-amber-500 text-amber-500" />
+                              <span>{vendor.rating}</span>
+                              <span className="text-slate-400 text-[10px]">({vendor.reviews ? vendor.reviews.length : 3})</span>
+                            </div>
+                          </div>
+
+                          <h3 className="text-xs font-bold text-slate-900 mt-1 line-clamp-1 group-hover:text-emerald-800 transition-colors">
+                            {vendor.name}
+                          </h3>
+
+                          <p className="text-[11px] text-slate-500 mt-0.5 truncate">
+                            {vendor.ownerName}
+                          </p>
+
+                          <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-0.5">
+                            <MapPin size={10} className="shrink-0" />
+                            <span className="truncate">{vendor.location}</span>
                           </div>
                         </div>
 
-                        <h3 className="text-xs font-bold text-slate-900 mt-1 line-clamp-1 group-hover:text-emerald-800 transition-colors">
-                          {vendor.name}
-                        </h3>
-
-                        <p className="text-[11px] text-slate-500 mt-0.5 truncate">
-                          {vendor.ownerName}
-                        </p>
-
-                        <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-0.5">
-                          <MapPin size={10} className="shrink-0" />
-                          <span className="truncate">{vendor.location}</span>
+                        <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                          <span className="text-slate-500 font-medium">
+                            {vendor.products.length} Komoditas di Katalog
+                          </span>
+                          <span className="font-bold text-emerald-800 flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
+                            Lihat Katalog <ChevronRight size={13} />
+                          </span>
                         </div>
-                      </div>
-
-                      <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
-                        <span className="text-slate-500 font-medium">
-                          {vendor.products.length} Komoditas di Katalog
-                        </span>
-                        <span className="font-bold text-emerald-800 flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
-                          Lihat Katalog <ChevronRight size={13} />
-                        </span>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         ) : (

@@ -22,6 +22,7 @@ import {
   MOCK_TANI_IKAN_VENDORS,
   MOCK_HALL_OF_FAME,
   MOCK_HALL_OF_FAME_NOMINATIONS,
+  MOCK_NOTIFICATIONS,
 } from './src/data/mockData.js';
 
 // Deep clones for backend state persistence during server runtime
@@ -38,6 +39,7 @@ let dbJobVacancies = JSON.parse(JSON.stringify(MOCK_JOB_VACANCIES));
 let dbTaniIkanVendors = JSON.parse(JSON.stringify(MOCK_TANI_IKAN_VENDORS));
 let dbHallOfFame = JSON.parse(JSON.stringify(MOCK_HALL_OF_FAME));
 let dbHallOfFameNominations = JSON.parse(JSON.stringify(MOCK_HALL_OF_FAME_NOMINATIONS));
+let dbNotifications = JSON.parse(JSON.stringify(MOCK_NOTIFICATIONS));
 
 // Promos data
 let dbPromos = [
@@ -696,6 +698,203 @@ export async function createApp() {
       hasVoted: nom.hasVoted,
       supportVotes: nom.supportVotes,
     });
+  });
+
+  // -------------------------------------------------------------
+  // API: Persetujuan & Publikasi Usulan Hall of Fame oleh Admin
+  // -------------------------------------------------------------
+  app.post('/api/hall-of-fame/nomination/:id/approve', (req: Request, res: Response) => {
+    const { adminName = 'Admin Balai Desa' } = req.body;
+    const nom = dbHallOfFameNominations.find((n: any) => n.id === req.params.id);
+    if (!nom) {
+      return res.status(404).json({ success: false, message: 'Usulan tidak ditemukan' });
+    }
+
+    nom.status = 'Disetujui';
+    nom.verifiedAt = 'Hari ini';
+    nom.verifiedBy = adminName;
+
+    // Create in-app notification for the citizen/proposer
+    const notif = {
+      id: `notif-${Date.now()}`,
+      type: 'hall_of_fame_approved',
+      title: 'Usulan Tokoh Disetujui Tim Desa! 🏆',
+      message: `Kabar baik! Usulan Anda untuk "${nom.nomineeName}" kategori ${nom.category} telah ditinjau dan DISETUJUI oleh ${adminName}.`,
+      timestamp: 'Baru saja',
+      read: false,
+      category: 'Hall of Fame',
+      actionLink: {
+        screen: 'hall_of_fame',
+        targetId: nom.id,
+        label: 'Buka Hall of Fame',
+      },
+      meta: {
+        nomineeName: nom.nomineeName,
+        category: nom.category,
+        adminName,
+        status: 'Disetujui',
+      },
+    };
+    dbNotifications.unshift(notif);
+
+    res.json({
+      success: true,
+      message: `Usulan "${nom.nomineeName}" berhasil disetujui. Notifikasi telah dikirim ke warga pengusul.`,
+      nomination: nom,
+      notification: notif,
+    });
+  });
+
+  app.post('/api/hall-of-fame/nomination/:id/publish', (req: Request, res: Response) => {
+    const { adminName = 'Admin Balai Desa' } = req.body;
+    const nom = dbHallOfFameNominations.find((n: any) => n.id === req.params.id);
+    if (!nom) {
+      return res.status(404).json({ success: false, message: 'Usulan tidak ditemukan' });
+    }
+
+    nom.status = 'Dipublikasikan';
+    nom.verifiedAt = 'Hari ini';
+    nom.verifiedBy = adminName;
+
+    // Also update or add to official verified list in dbHallOfFame
+    let existingItem = dbHallOfFame.find((h: any) => h.name.toLowerCase() === nom.nomineeName.toLowerCase());
+    if (existingItem) {
+      existingItem.verifiedStatus = 'terverifikasi';
+    } else {
+      dbHallOfFame.unshift({
+        id: `hof-pub-${Date.now()}`,
+        name: nom.nomineeName,
+        category: nom.category,
+        title: nom.title || `Tokoh Inspiratif ${nom.category}`,
+        origin: nom.origin,
+        image: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80',
+        story: nom.reason || nom.achievements,
+        achievements: [nom.achievements],
+        year: '2024',
+        appreciationsCount: nom.supportVotes || 1,
+        hasAppreciated: false,
+        nominatedBy: `Diusulkan oleh ${nom.proposerName} (${nom.proposerRtRw})`,
+        verifiedStatus: 'terverifikasi',
+        comments: [
+          {
+            id: `c-pub-${Date.now()}`,
+            author: adminName,
+            role: 'Balai Desa',
+            text: 'Resmi diverifikasi dan dipublikasikan ke Galeri Kehormatan Hall of Fame Desa Arjawinangun.',
+            date: 'Baru saja',
+          },
+        ],
+      });
+    }
+
+    // Create in-app notification for the citizen
+    const notif = {
+      id: `notif-${Date.now()}`,
+      type: 'hall_of_fame_published',
+      title: 'Tokoh Usulan Anda Resmi Dipublikasikan! 🌟',
+      message: `Selamat! "${nom.nomineeName}" kini resmi dipublikasikan di Galeri Kehormatan Hall of Fame Desa Arjawinangun. Seluruh warga kini dapat melihat profil dan memberikan apresiasi!`,
+      timestamp: 'Baru saja',
+      read: false,
+      category: 'Hall of Fame',
+      actionLink: {
+        screen: 'hall_of_fame',
+        targetId: nom.id,
+        label: 'Lihat Profil Tokoh',
+      },
+      meta: {
+        nomineeName: nom.nomineeName,
+        category: nom.category,
+        adminName,
+        status: 'Dipublikasikan',
+      },
+    };
+    dbNotifications.unshift(notif);
+
+    res.json({
+      success: true,
+      message: `"${nom.nomineeName}" resmi dipublikasikan ke Hall of Fame! Notifikasi telah dikirim ke warga pengusul.`,
+      nomination: nom,
+      notification: notif,
+    });
+  });
+
+  // Helper endpoint to simulate receiving an approval/publication notification
+  app.post('/api/hall-of-fame/nomination/simulate-approval', (req: Request, res: Response) => {
+    const {
+      nomineeName = 'Kang Maman Suparman',
+      category = 'Relawan Sosial',
+      action = 'publish', // 'approve' | 'publish'
+    } = req.body;
+
+    const isPublish = action === 'publish';
+    const notif = {
+      id: `notif-${Date.now()}`,
+      type: isPublish ? 'hall_of_fame_published' : 'hall_of_fame_approved',
+      title: isPublish
+        ? 'Tokoh Usulan Anda Resmi Dipublikasikan! 🌟'
+        : 'Usulan Tokoh Disetujui Tim Desa! 🏆',
+      message: isPublish
+        ? `Selamat! Usulan Anda untuk "${nomineeName}" (${category}) telah disetujui dan RESMI DIPUBLIKASIKAN ke Galeri Kehormatan Desa Arjawinangun!`
+        : `Kabar baik! Usulan Anda untuk "${nomineeName}" (${category}) telah ditinjau dan DISETUJUI oleh Tim Verifikasi Balai Desa.`,
+      timestamp: 'Baru saja',
+      read: false,
+      category: 'Hall of Fame',
+      actionLink: {
+        screen: 'hall_of_fame',
+        label: 'Buka Hall of Fame',
+      },
+      meta: {
+        nomineeName,
+        category,
+        status: isPublish ? 'Dipublikasikan' : 'Disetujui',
+        adminName: 'Admin Balai Desa Arjawinangun',
+      },
+    };
+
+    dbNotifications.unshift(notif);
+
+    res.json({
+      success: true,
+      message: 'Simulasi notifikasi persetujuan berhasil dibuat!',
+      notification: notif,
+    });
+  });
+
+  // -------------------------------------------------------------
+  // API: Pusat Notifikasi Dalam Aplikasi
+  // -------------------------------------------------------------
+  app.get('/api/notifications', (req: Request, res: Response) => {
+    const unreadCount = dbNotifications.filter((n: any) => !n.read).length;
+    res.json({
+      success: true,
+      unreadCount,
+      data: dbNotifications,
+    });
+  });
+
+  app.post('/api/notifications/mark-read', (req: Request, res: Response) => {
+    const { id } = req.body;
+    if (id) {
+      const notif = dbNotifications.find((n: any) => n.id === id);
+      if (notif) notif.read = true;
+    } else {
+      // Mark all as read
+      dbNotifications.forEach((n: any) => {
+        n.read = true;
+      });
+    }
+
+    const unreadCount = dbNotifications.filter((n: any) => !n.read).length;
+    res.json({
+      success: true,
+      unreadCount,
+      data: dbNotifications,
+    });
+  });
+
+  app.post('/api/notifications/clear', (req: Request, res: Response) => {
+    dbNotifications = [];
+    res.json({ success: true, unreadCount: 0, data: [] });
   });
 
   // -------------------------------------------------------------

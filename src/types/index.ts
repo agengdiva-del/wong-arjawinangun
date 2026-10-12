@@ -380,8 +380,33 @@ export interface HallOfFameNomination {
   proposerPhone: string;
   proposerRtRw: string;
   createdAt: string;
-  status: 'Menunggu Verifikasi Tim Desa' | 'Disetujui' | 'Ditinjau';
+  status: 'Menunggu Verifikasi Tim Desa' | 'Disetujui' | 'Dipublikasikan' | 'Ditinjau';
   supportVotes: number;
   hasVoted?: boolean;
+  verifiedAt?: string;
+  verifiedBy?: string;
 }
+
+export interface AppNotification {
+  id: string;
+  userId?: string;
+  type: 'hall_of_fame_approved' | 'hall_of_fame_published' | 'system' | 'poll' | 'general';
+  title: string;
+  message: string;
+  timestamp: string;
+  read: boolean;
+  category: 'Hall of Fame' | 'Info Desa' | 'Layanan';
+  actionLink?: {
+    screen: ScreenId;
+    targetId?: string;
+    label: string;
+  };
+  meta?: {
+    nomineeName?: string;
+    category?: string;
+    adminName?: string;
+    status?: string;
+  };
+}
+
 

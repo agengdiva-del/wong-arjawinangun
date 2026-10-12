@@ -238,7 +238,28 @@ export const PollingScreen: React.FC<PollingScreenProps> = ({
 
         {/* Polling List */}
         <div className="space-y-3.5">
-          {filteredPolls.map((poll) => {
+          {filteredPolls.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-8 text-center space-y-2">
+              <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-700 flex items-center justify-center mx-auto">
+                <Vote size={24} />
+              </div>
+              <h4 className="text-xs font-bold text-slate-800">Belum Ada Polling Musyawarah Aktif</h4>
+              <p className="text-[11px] text-slate-500 max-w-xs mx-auto">
+                Aparatur desa atau pengurus RT/RW dapat membuka pemungutan suara rembug desa untuk menjaring aspirasi warga.
+              </p>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(true)}
+                  className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs rounded-xl shadow-xs transition-colors"
+                >
+                  <PlusCircle size={13} />
+                  <span>Buat Polling Pertama</span>
+                </button>
+              )}
+            </div>
+          ) : (
+            filteredPolls.map((poll) => {
             const hasVoted = Boolean(poll.userVotedOptionId);
             const isClosed = poll.status === 'Ditutup';
 
@@ -375,7 +396,7 @@ export const PollingScreen: React.FC<PollingScreenProps> = ({
                 </div>
               </div>
             );
-          })}
+          }))}
         </div>
       </div>
 

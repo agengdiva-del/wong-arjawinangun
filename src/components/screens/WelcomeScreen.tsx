@@ -64,17 +64,17 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   // Authentication Mode: 'masuk' | 'daftar'
   const [authMode, setAuthMode] = useState<'masuk' | 'daftar'>('masuk');
 
-  // Direct Login Form States (Masuk Langsung Tanpa OTP WhatsApp)
-  const [loginPhone, setLoginPhone] = useState('081234567890');
+  // Direct Login Form States (Masuk Langsung)
+  const [loginPhone, setLoginPhone] = useState('');
   const [loginRole, setLoginRole] = useState<AppRole>(initialRole || 'pelanggan');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
-  // WhatsApp Auth Form States (Khusus Pendaftaran Baru)
-  const [whatsappPhone, setWhatsappPhone] = useState('081234567890');
+  // WhatsApp Auth Form States (Pendaftaran Warga Baru)
+  const [whatsappPhone, setWhatsappPhone] = useState('');
   const [registerName, setRegisterName] = useState('');
   const [registerRole, setRegisterRole] = useState<AppRole>('pelanggan');
-  const [registerRtRw, setRegisterRtRw] = useState('RT 03 / RW 02 Blok Makmur');
+  const [registerRtRw, setRegisterRtRw] = useState('');
 
   // OTP Verification Modal States
   const [showOtpModal, setShowOtpModal] = useState(false);
@@ -84,43 +84,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [otpError, setOtpError] = useState<string | null>(null);
   const [otpSuccessNotice, setOtpSuccessNotice] = useState<string | null>(null);
-
-  // Public Community Demo Accounts
-  const publicAccounts = [
-    {
-      role: 'pelanggan' as AppRole,
-      title: 'Pelanggan',
-      badge: '👤 Warga & Pembeli',
-      user: accountsData.pelanggan || MOCK_USERS.pelanggan,
-      phone: '081234567890',
-      tagline: `${accountsData.pelanggan?.location || 'Blok Makmur'} · Warga Terverifikasi`,
-      accent: 'border-red-500 bg-red-50/70 text-red-950',
-      badgeColor: 'bg-red-600 text-white',
-      avatarBorder: 'border-red-500',
-    },
-    {
-      role: 'mitra' as AppRole,
-      title: 'Mitra',
-      badge: '🚲 Driver & Jasa',
-      user: accountsData.mitra || MOCK_USERS.mitra,
-      phone: '081234567891',
-      tagline: 'Mitra Becak Onthel No. 14 Blok Makmur',
-      accent: 'border-amber-500 bg-amber-50/70 text-amber-950',
-      badgeColor: 'bg-amber-600 text-white',
-      avatarBorder: 'border-amber-500',
-    },
-    {
-      role: 'merchant' as AppRole,
-      title: 'Merchant',
-      badge: '🏪 Kios Pasar',
-      user: accountsData.merchant || MOCK_USERS.merchant,
-      phone: '087722334455',
-      tagline: 'Kios Sayur & Bumbu Pasar Jungjang',
-      accent: 'border-emerald-500 bg-emerald-50/70 text-emerald-950',
-      badgeColor: 'bg-emerald-600 text-white',
-      avatarBorder: 'border-emerald-500',
-    },
-  ];
 
   // OTP Timer countdown
   useEffect(() => {
@@ -214,7 +177,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
       }
     } catch (err: any) {
       setIsVerifyingOtp(false);
-      // Fallback verification for demo
+      // Fallback verifikasi offline
       if (otpCode === '123456' || otpCode === receivedOtpPreview) {
         setOtpSuccessNotice('Verifikasi Berhasil!');
         setTimeout(() => {
@@ -228,29 +191,36 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
     }
   };
 
-  // Direct Login (Tanpa OTP WhatsApp untuk Tab Masuk)
+  // Direct Login (Tab Masuk)
   const handleDirectLogin = async () => {
+    if (!loginPhone.trim()) {
+      setLoginError('Silakan masukkan nomor WhatsApp / ID Warga untuk masuk.');
+      return;
+    }
+
     setIsLoggingIn(true);
     setLoginError(null);
 
     try {
       const res = await api.directLogin(loginPhone, loginRole);
       setIsLoggingIn(false);
-      const user = res?.user || accountsData[loginRole] || MOCK_USERS[loginRole] || MOCK_USERS.pelanggan;
+      const baseUser = res?.user || accountsData[loginRole] || MOCK_USERS[loginRole] || MOCK_USERS.pelanggan;
+      const user = {
+        ...baseUser,
+        emailOrPhone: loginPhone.trim(),
+        location: selectedLocation.name,
+      };
       onContinue(user.role || loginRole, selectedLocation, user);
     } catch (err: any) {
       setIsLoggingIn(false);
-      const user = accountsData[loginRole] || MOCK_USERS[loginRole] || MOCK_USERS.pelanggan;
+      const baseUser = accountsData[loginRole] || MOCK_USERS[loginRole] || MOCK_USERS.pelanggan;
+      const user = {
+        ...baseUser,
+        emailOrPhone: loginPhone.trim(),
+        location: selectedLocation.name,
+      };
       onContinue(loginRole, selectedLocation, user);
     }
-  };
-
-  // Quick select akun demo warga (Langsung Masuk 1-Klik Tanpa OTP)
-  const handleQuickDemoSelect = (role: AppRole, phone: string) => {
-    setLoginRole(role);
-    setLoginPhone(phone);
-    const user = accountsData[role] || MOCK_USERS[role] || MOCK_USERS.pelanggan;
-    onContinue(role, selectedLocation, user);
   };
 
   return (
@@ -569,40 +539,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
         )}
       </div>
 
-      {/* 3. OPSI MASUK CEPAT DENGAN AKUN TERVERIFIKASI (DEMO SATU-KLIK) */}
-      <div className="space-y-1.5 mb-2.5 text-left">
-        <div className="flex items-center justify-between px-1">
-          <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">
-            Atau Pilih Akun Demo Warga (1-Klik):
-          </span>
-          <span className="text-[9px] text-slate-500">Masuk Langsung</span>
-        </div>
-
-        <div className="grid grid-cols-3 gap-1.5">
-          {publicAccounts.map((item) => (
-            <button
-              key={item.role}
-              type="button"
-              onClick={() => handleQuickDemoSelect(item.role, item.phone)}
-              className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-all flex flex-col items-center text-center shadow-2xs group active:scale-[0.98] cursor-pointer"
-            >
-              <div className={`w-8 h-8 rounded-full overflow-hidden border-2 ${item.avatarBorder} mb-1`}>
-                <img
-                  src={item.user.avatar}
-                  alt={item.user.name}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <span className="text-[10px] font-extrabold text-slate-900 truncate w-full">
-                {item.user.name.split(' ')[0]}
-              </span>
-              <span className={`text-[8px] font-bold px-1 py-0.2 rounded mt-0.5 ${item.badgeColor}`}>
-                {item.title}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
+      {/* 2b. Form Pendaftaran Selesai */}
 
       {/* 4. TEMPAT KHUSUS: Portal Petugas Balai Desa (Admin & Super Admin) */}
       {onOpenAdminPortal && (

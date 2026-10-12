@@ -211,77 +211,89 @@ export const BelanjaOfflineFlow: React.FC<BelanjaOfflineFlowProps> = ({
                 <span className="text-[10px] text-red-600 font-bold">Katalog & Ulasan Aktif</span>
               </div>
 
-              {filteredVendors.map((vendor) => {
-                const isFav = favorites[vendor.id];
-                return (
-                  <div
-                    key={vendor.id}
-                    onClick={() => handleOpenVendor(vendor)}
-                    className="bg-white rounded-2xl border border-slate-200/90 p-3.5 shadow-2xs hover:shadow-sm hover:border-red-300 transition-all cursor-pointer group"
-                  >
-                    <div className="flex gap-3">
-                      {/* Image / Thumbnail */}
-                      <div className="w-20 h-20 rounded-xl overflow-hidden bg-slate-100 shrink-0 relative">
-                        <img
-                          src={vendor.image}
-                          alt={vendor.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          referrerPolicy="no-referrer"
-                        />
-                        <button
-                          type="button"
-                          onClick={(e) => toggleFavorite(vendor.id, e)}
-                          className="absolute top-1 right-1 p-1 rounded-full bg-white/80 backdrop-blur-xs text-slate-400 hover:text-red-500 transition-colors"
-                        >
-                          <Heart size={12} className={isFav ? 'fill-red-600 text-red-600' : ''} />
-                        </button>
-                      </div>
+              {filteredVendors.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-8 text-center space-y-2">
+                  <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center mx-auto">
+                    <Store size={24} />
+                  </div>
+                  <h4 className="text-xs font-bold text-slate-800">Belum Ada Kios atau Toko Terdaftar</h4>
+                  <p className="text-[11px] text-slate-500 max-w-xs mx-auto">
+                    Pedagang pasar tradisional dan pengusaha kuliner Arjawinangun dapat mendaftar langsung sebagai pedagang resmi desa.
+                  </p>
+                </div>
+              ) : (
+                filteredVendors.map((vendor) => {
+                  const isFav = favorites[vendor.id];
+                  return (
+                    <div
+                      key={vendor.id}
+                      onClick={() => handleOpenVendor(vendor)}
+                      className="bg-white rounded-2xl border border-slate-200/90 p-3.5 shadow-2xs hover:shadow-sm hover:border-red-300 transition-all cursor-pointer group"
+                    >
+                      <div className="flex gap-3">
+                        {/* Image / Thumbnail */}
+                        <div className="w-20 h-20 rounded-xl overflow-hidden bg-slate-100 shrink-0 relative">
+                          <img
+                            src={vendor.image}
+                            alt={vendor.name}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            referrerPolicy="no-referrer"
+                          />
+                          <button
+                            type="button"
+                            onClick={(e) => toggleFavorite(vendor.id, e)}
+                            className="absolute top-1 right-1 p-1 rounded-full bg-white/80 backdrop-blur-xs text-slate-400 hover:text-red-500 transition-colors"
+                          >
+                            <Heart size={12} className={isFav ? 'fill-red-600 text-red-600' : ''} />
+                          </button>
+                        </div>
 
-                      {/* Store Details */}
-                      <div className="flex-1 min-w-0 flex flex-col justify-between">
-                        <div>
-                          <div className="flex items-center justify-between gap-1">
-                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-red-700 bg-red-50 px-1.5 py-0.5 rounded">
-                              {vendor.category === 'kuliner' ? 'Kuliner' : 'Pasar'}
-                            </span>
-                            <div className="flex items-center gap-1 text-[11px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.2 rounded-md">
-                              <Star size={11} className="fill-amber-500 text-amber-500" />
-                              <span>{vendor.rating}</span>
-                              <span className="text-slate-400 text-[10px]">
-                                ({vendor.reviews ? vendor.reviews.length : 3})
+                        {/* Store Details */}
+                        <div className="flex-1 min-w-0 flex flex-col justify-between">
+                          <div>
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="text-[10px] font-extrabold uppercase tracking-wider text-red-700 bg-red-50 px-1.5 py-0.5 rounded">
+                                {vendor.category === 'kuliner' ? 'Kuliner' : 'Pasar'}
                               </span>
+                              <div className="flex items-center gap-1 text-[11px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.2 rounded-md">
+                                <Star size={11} className="fill-amber-500 text-amber-500" />
+                                <span>{vendor.rating}</span>
+                                <span className="text-slate-400 text-[10px]">
+                                  ({vendor.reviews ? vendor.reviews.length : 3})
+                                </span>
+                              </div>
+                            </div>
+
+                            <h3 className="text-xs font-bold text-slate-900 mt-1 line-clamp-1 group-hover:text-red-700 transition-colors">
+                              {vendor.name}
+                            </h3>
+
+                            <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-1">
+                              <MapPin size={11} className="text-slate-400 shrink-0" />
+                              <span className="truncate">{vendor.stallLocation}</span>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 text-[10px] text-emerald-700 mt-0.5 font-medium">
+                              <Clock size={10} className="shrink-0" />
+                              <span>Buka {vendor.openTime}</span>
                             </div>
                           </div>
 
-                          <h3 className="text-xs font-bold text-slate-900 mt-1 line-clamp-1 group-hover:text-red-700 transition-colors">
-                            {vendor.name}
-                          </h3>
-
-                          <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-1">
-                            <MapPin size={11} className="text-slate-400 shrink-0" />
-                            <span className="truncate">{vendor.stallLocation}</span>
+                          {/* Bottom Action: Buka Katalog & Komentar */}
+                          <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                            <span className="text-slate-500 font-medium">
+                              {vendor.products.length} Barang di Katalog
+                            </span>
+                            <span className="font-bold text-red-700 flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
+                              Katalog & Ulasan <ChevronRight size={13} />
+                            </span>
                           </div>
-
-                          <div className="flex items-center gap-1.5 text-[10px] text-emerald-700 mt-0.5 font-medium">
-                            <Clock size={10} className="shrink-0" />
-                            <span>Buka {vendor.openTime}</span>
-                          </div>
-                        </div>
-
-                        {/* Bottom Action: Buka Katalog & Komentar */}
-                        <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
-                          <span className="text-slate-500 font-medium">
-                            {vendor.products.length} Barang di Katalog
-                          </span>
-                          <span className="font-bold text-red-700 flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
-                            Katalog & Ulasan <ChevronRight size={13} />
-                          </span>
                         </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </div>
         ) : (

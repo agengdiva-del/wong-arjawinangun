@@ -294,18 +294,26 @@ export const LokerScreen: React.FC<LokerScreenProps> = ({
           ))}
 
           {filteredJobs.length === 0 && (
-            <div className="text-center py-8 bg-white rounded-2xl border border-slate-200 p-4 space-y-2">
-              <p className="text-xs text-slate-500">Tidak ada lowongan yang sesuai kriteria pencarian.</p>
-              <button
-                onClick={() => {
-                  setSelectedCategory('Semua');
-                  setSelectedType('Semua');
-                  setSearchQuery('');
-                }}
-                className="text-xs text-red-700 font-bold underline"
-              >
-                Reset Semua Filter
-              </button>
+            <div className="text-center py-8 bg-white rounded-2xl border border-dashed border-slate-200 p-6 space-y-2">
+              <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
+                <Briefcase size={24} />
+              </div>
+              <h4 className="text-xs font-bold text-slate-800">Belum Ada Lowongan Pekerjaan Aktif</h4>
+              <p className="text-[11px] text-slate-500 max-w-xs mx-auto">
+                Pemilik usaha, warung, atau UMKM lokal dapat memasang informasi loker pekerjaan untuk warga Arjawinangun.
+              </p>
+              {searchQuery && (
+                <button
+                  onClick={() => {
+                    setSelectedCategory('Semua');
+                    setSelectedType('Semua');
+                    setSearchQuery('');
+                  }}
+                  className="text-xs text-red-700 font-bold underline cursor-pointer"
+                >
+                  Reset Semua Filter
+                </button>
+              )}
             </div>
           )}
         </div>

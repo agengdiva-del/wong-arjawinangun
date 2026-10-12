@@ -4,8 +4,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { ScreenId, AppRole, LocationItem, UserAccount, VillagePoll } from './types';
-import { MOCK_LOCATIONS, MOCK_USERS, MOCK_VILLAGE_POLLS } from './data/mockData';
+import { ScreenId, AppRole, LocationItem, UserAccount, VillagePoll, AppNotification } from './types';
+import { MOCK_LOCATIONS, MOCK_USERS, MOCK_VILLAGE_POLLS, MOCK_NOTIFICATIONS } from './data/mockData';
 import { api } from './services/api';
 import { MobileFrame } from './components/MobileFrame';
 import { WelcomeScreen } from './components/screens/WelcomeScreen';
@@ -25,6 +25,8 @@ import { QrisDonasiScreen } from './components/screens/QrisDonasiScreen';
 import { LokerScreen } from './components/screens/LokerScreen';
 import { TaniIkanScreen } from './components/screens/TaniIkanScreen';
 import { HallOfFameScreen } from './components/screens/HallOfFameScreen';
+import { NotificationModal } from './components/NotificationModal';
+import { Trophy } from 'lucide-react';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<ScreenId>('dashboard');
@@ -54,13 +56,52 @@ export default function App() {
     return MOCK_VILLAGE_POLLS;
   });
 
+  // Synchronized In-App Notifications
+  const [notifications, setNotifications] = useState<AppNotification[]>(() => {
+    try {
+      const saved = localStorage.getItem('wong_arjawinangun_notifications');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      // ignore
+    }
+    return MOCK_NOTIFICATIONS;
+  });
+
+  const [showNotificationModal, setShowNotificationModal] = useState<boolean>(false);
+  const [toastNotif, setToastNotif] = useState<AppNotification | null>(null);
+
+  // Sync notifications to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('wong_arjawinangun_notifications', JSON.stringify(notifications));
+    } catch (e) {}
+  }, [notifications]);
+
+  // Pembersihan otomatis data demo lama & inisialisasi aplikasi bersih siap pakai
+  useEffect(() => {
+    try {
+      const isCleaned = localStorage.getItem('wong_arjawinangun_clean_ready_v2');
+      if (!isCleaned) {
+        localStorage.removeItem('wong_arjawinangun_user_accounts');
+        localStorage.removeItem('wong_arjawinangun_polls');
+        localStorage.removeItem('wong_arjawinangun_notifications');
+        localStorage.removeItem('wong_arjawinangun_active_user');
+        localStorage.setItem('wong_arjawinangun_clean_ready_v2', 'true');
+        setUserAccounts(MOCK_USERS);
+        setPolls([]);
+        setNotifications([]);
+      }
+    } catch (e) {}
+  }, []);
+
   // Load data from backend on startup
   useEffect(() => {
     async function loadBackendData() {
       try {
-        const [backendProfiles, backendPolls] = await Promise.all([
+        const [backendProfiles, backendPolls, backendNotifs] = await Promise.all([
           api.getProfiles(),
           api.getPolls(),
+          api.getNotifications(),
         ]);
         if (backendProfiles && Object.keys(backendProfiles).length > 0) {
           setUserAccounts((prev) => ({ ...prev, ...backendProfiles }));
@@ -68,12 +109,50 @@ export default function App() {
         if (backendPolls && backendPolls.length > 0) {
           setPolls(backendPolls);
         }
+        if (backendNotifs && backendNotifs.data && backendNotifs.data.length > 0) {
+          setNotifications(backendNotifs.data);
+        }
       } catch (err) {
         console.warn('Backend sync initial notice:', err);
       }
     }
     loadBackendData();
   }, []);
+
+  const handleMarkNotificationRead = async (id?: string) => {
+    setNotifications((prev) =>
+      prev.map((n) => (id ? (n.id === id ? { ...n, read: true } : n) : { ...n, read: true }))
+    );
+    try {
+      await api.markNotificationRead(id);
+    } catch (err) {}
+  };
+
+  const handleClearNotifications = async () => {
+    setNotifications([]);
+    try {
+      await api.clearNotifications();
+    } catch (err) {}
+  };
+
+  const handleSimulateApproval = async (action: 'approve' | 'publish') => {
+    try {
+      const res = await api.simulateApprovalNotification(
+        'Kang H. Sudirman Al-Hafidz',
+        'Tokoh Masyarakat',
+        action
+      );
+      if (res && res.notification) {
+        setNotifications((prev) => [res.notification, ...prev]);
+        setToastNotif(res.notification);
+        setTimeout(() => setToastNotif(null), 6000);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const unreadNotificationsCount = notifications.filter((n) => !n.read).length;
 
   const currentUser = userAccounts[userRole] || MOCK_USERS[userRole] || MOCK_USERS.pelanggan;
 
@@ -238,6 +317,9 @@ export default function App() {
           currentUser={currentUser}
           villagePolls={polls}
           isWireframe={isWireframe}
+          onOpenNotifications={() => setShowNotificationModal(true)}
+          unreadNotificationsCount={unreadNotificationsCount}
+          notifications={notifications}
         />
       )}
 
@@ -299,6 +381,10 @@ export default function App() {
         <HallOfFameScreen
           onBack={() => setCurrentScreen('dashboard')}
           isWireframe={isWireframe}
+          userRole={userRole}
+          onOpenNotifications={() => setShowNotificationModal(true)}
+          unreadNotificationsCount={unreadNotificationsCount}
+          onSimulateApproval={handleSimulateApproval}
         />
       )}
 
@@ -394,6 +480,61 @@ export default function App() {
           isWireframe={isWireframe}
         />
       )}
+
+      {/* Floating In-App Toast Notification Banner */}
+      {toastNotif && (
+        <div className="fixed top-3 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-3 animate-in slide-in-from-top-4 duration-300">
+          <div
+            onClick={() => {
+              setShowNotificationModal(true);
+              setToastNotif(null);
+            }}
+            className="p-3 rounded-2xl bg-gradient-to-r from-red-800 via-rose-700 to-amber-700 text-white shadow-2xl border border-amber-300/60 cursor-pointer flex items-start gap-2.5 active:scale-[0.99] transition-transform"
+          >
+            <div className="w-8 h-8 rounded-xl bg-amber-400 text-red-950 flex items-center justify-center shrink-0 shadow-xs">
+              <Trophy size={16} />
+            </div>
+            <div className="flex-1 min-w-0 text-left">
+              <div className="flex items-center justify-between">
+                <span className="text-[9px] font-black uppercase text-amber-200 tracking-wider">
+                  {toastNotif.type === 'hall_of_fame_published' ? '🌟 Resmi Dipublikasikan' : '🏆 Usulan Disetujui'}
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setToastNotif(null);
+                  }}
+                  className="text-white/60 hover:text-white text-xs p-0.5"
+                >
+                  ✕
+                </button>
+              </div>
+              <h4 className="text-xs font-black text-white mt-0.5 leading-snug">
+                {toastNotif.title}
+              </h4>
+              <p className="text-[11px] text-amber-100 line-clamp-2 mt-0.5">
+                {toastNotif.message}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* In-App Notification Center Modal */}
+      <NotificationModal
+        isOpen={showNotificationModal}
+        onClose={() => setShowNotificationModal(false)}
+        notifications={notifications}
+        onMarkRead={handleMarkNotificationRead}
+        onClearAll={handleClearNotifications}
+        onNavigate={(screen, targetId) => {
+          setShowNotificationModal(false);
+          setCurrentScreen(screen);
+        }}
+        onSimulateApproval={handleSimulateApproval}
+        isWireframe={isWireframe}
+      />
     </MobileFrame>
   );
 }

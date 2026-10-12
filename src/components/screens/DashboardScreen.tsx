@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { LocationItem, ScreenId, AppRole, UserAccount, VillagePoll } from '../../types';
 import { APP_IMAGES, MOCK_LOCATIONS, LOCAL_SERVICES, MOCK_USERS, MOCK_VILLAGE_POLLS } from '../../data/mockData';
 import { api } from '../../services/api';
@@ -30,7 +30,15 @@ import {
   Navigation,
   RefreshCw,
   Trophy,
+  Bell,
+  LayoutGrid,
+  Flame,
+  RotateCcw,
+  TrendingUp,
+  Layers,
+  ArrowUpRight,
 } from 'lucide-react';
+import { AppNotification } from '../../types';
 
 interface DashboardScreenProps {
   currentLocation: LocationItem;
@@ -40,6 +48,9 @@ interface DashboardScreenProps {
   currentUser?: UserAccount;
   villagePolls?: VillagePoll[];
   isWireframe?: boolean;
+  onOpenNotifications?: () => void;
+  unreadNotificationsCount?: number;
+  notifications?: AppNotification[];
 }
 
 export const DashboardScreen: React.FC<DashboardScreenProps> = ({
@@ -50,10 +61,16 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   currentUser: propUser,
   villagePolls = MOCK_VILLAGE_POLLS,
   isWireframe = false,
+  onOpenNotifications,
+  unreadNotificationsCount = 0,
+  notifications = [],
 }) => {
   const activeUser = propUser || MOCK_USERS[userRole] || MOCK_USERS.pelanggan;
   const [searchQuery, setSearchQuery] = useState('');
-  const [showOptionalIcons, setShowOptionalIcons] = useState(true);
+  const [showAllServicesModal, setShowAllServicesModal] = useState(false);
+  const [serviceSearchQuery, setServiceSearchQuery] = useState('');
+  const [serviceFilterCategory, setServiceFilterCategory] = useState<string>('Semua');
+  const [serviceFeedbackToast, setServiceFeedbackToast] = useState<{ title: string; count: number; promoted?: boolean } | null>(null);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -96,126 +113,283 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   // Latest active poll to highlight on Dashboard
   const latestActivePoll = villagePolls.find((p) => p.status === 'Aktif') || villagePolls[0];
 
-  // Main requested menu icons
-  const mainServices = [
+  // -------------------------------------------------------------
+  // KOLEKSI LAYANAN WARGA & URUTAN DINAMIS FREKUENSI PENGGUNAAN
+  // -------------------------------------------------------------
+  interface VillageServiceItem {
+    id: string;
+    title: string;
+    subtitle: string;
+    category: 'Transportasi' | 'Belanja & Kuliner' | 'Pekerjaan & Usaha' | 'Sosial & Aspirasi';
+    icon: any;
+    screen: ScreenId;
+    defaultUsage: number;
+    bg: string;
+    badge?: string;
+    description: string;
+  }
+
+  const ALL_VILLAGE_SERVICES: VillageServiceItem[] = [
     {
       id: 'ojek_becak',
       title: 'Ojek & Becak',
       subtitle: 'Antar jemput warga',
+      category: 'Transportasi',
       icon: Bike,
-      screen: 'ojek_becak' as ScreenId,
+      screen: 'ojek_becak',
+      defaultUsage: 1840,
       bg: isWireframe ? 'bg-zinc-100 text-zinc-900 border border-zinc-300' : 'bg-red-50 text-red-600 border border-red-100',
       badge: 'Lokal',
-    },
-    {
-      id: 'belanja',
-      title: 'Belanja Offline',
-      subtitle: 'Pasar & warung',
-      icon: ShoppingBag,
-      screen: 'belanja_offline' as ScreenId,
-      bg: isWireframe ? 'bg-zinc-100 text-zinc-900 border border-zinc-300' : 'bg-sky-50 text-sky-600 border border-sky-100',
-      badge: 'Katalog',
+      description: 'Armada pangkalan ojek & becak motor khas Arjawinangun siap antar warga.',
     },
     {
       id: 'kuliner',
       title: 'Kuliner',
       subtitle: 'Khas Cirebon',
+      category: 'Belanja & Kuliner',
       icon: UtensilsCrossed,
-      screen: 'kuliner' as ScreenId,
+      screen: 'kuliner',
+      defaultUsage: 1520,
       bg: isWireframe ? 'bg-zinc-100 text-zinc-900 border border-zinc-300' : 'bg-rose-50 text-rose-600 border border-rose-100',
       badge: 'Katalog',
+      description: 'Empal gentong, nasi jamblang, tahu gejrot & aneka jajanan pasar legendaris.',
+    },
+    {
+      id: 'belanja',
+      title: 'Belanja Offline',
+      subtitle: 'Pasar & warung',
+      category: 'Belanja & Kuliner',
+      icon: ShoppingBag,
+      screen: 'belanja_offline',
+      defaultUsage: 1290,
+      bg: isWireframe ? 'bg-zinc-100 text-zinc-900 border border-zinc-300' : 'bg-sky-50 text-sky-600 border border-sky-100',
+      badge: 'Katalog',
+      description: 'Kios sembako, los sayuran segar, dan bumbu dapur Pasar Jungjang.',
     },
     {
       id: 'qris_donasi',
       title: 'QRIS Donasi',
-      subtitle: 'Infaq & sedekah warga',
+      subtitle: 'Infaq & kas desa',
+      category: 'Sosial & Aspirasi',
       icon: HeartHandshake,
-      screen: 'qris_donasi' as ScreenId,
+      screen: 'qris_donasi',
+      defaultUsage: 1150,
       bg: isWireframe ? 'bg-zinc-100 text-zinc-900 border border-zinc-300' : 'bg-emerald-50 text-emerald-700 border border-emerald-100',
       badge: 'Utama',
+      description: 'Infaq masjid, santunan anak yatim & dana darurat siaga bencana warga.',
     },
     {
       id: 'jasa',
       title: 'Jasa Lokal',
       subtitle: 'Tukang & servis',
+      category: 'Pekerjaan & Usaha',
       icon: Wrench,
-      screen: 'jasa_lokal' as ScreenId,
+      screen: 'jasa_lokal',
+      defaultUsage: 980,
       bg: isWireframe ? 'bg-zinc-100 text-zinc-900 border border-zinc-300' : 'bg-amber-50 text-amber-600 border border-amber-100',
+      description: 'Panggilan tukang ledeng, servis AC/elektronik, tukang kayu & tambal ban.',
     },
     {
       id: 'loker',
       title: 'Lowongan Kerja',
       subtitle: 'Loker desa & harian',
+      category: 'Pekerjaan & Usaha',
       icon: Briefcase,
-      screen: 'loker' as ScreenId,
+      screen: 'loker',
+      defaultUsage: 860,
       bg: isWireframe ? 'bg-zinc-100 text-zinc-900 border border-zinc-300' : 'bg-indigo-50 text-indigo-600 border border-indigo-100',
       badge: 'Loker',
+      description: 'Info lowongan kerja UMKM, pabrik, pergudangan & pekerjaan harian lepas.',
     },
     {
       id: 'tani_ikan',
       title: 'Tani & Ikan',
-      subtitle: 'Gabah, benih & bibit',
+      subtitle: 'Gabah & benih lele',
+      category: 'Pekerjaan & Usaha',
       icon: Sprout,
-      screen: 'tani_ikan' as ScreenId,
+      screen: 'tani_ikan',
+      defaultUsage: 750,
       bg: isWireframe ? 'bg-zinc-100 text-zinc-900 border border-zinc-300' : 'bg-lime-50 text-lime-700 border border-lime-100',
       badge: 'Katalog',
+      description: 'Katalog bibit mangga gedong gincu, pupuk subsidi/organik, gabah & benih perikanan.',
+    },
+    {
+      id: 'hall_of_fame',
+      title: 'Hall of Fame',
+      subtitle: 'Tokoh & prestasi',
+      category: 'Sosial & Aspirasi',
+      icon: Trophy,
+      screen: 'hall_of_fame',
+      defaultUsage: 710,
+      bg: isWireframe ? 'bg-zinc-100 text-zinc-900 border border-zinc-300' : 'bg-amber-50 text-amber-800 border border-amber-200',
+      badge: 'Tokoh',
+      description: 'Panggung apresiasi tokoh masyarakat, atlet, pemuda berprestasi & usulan warga.',
+    },
+    {
+      id: 'polling_desa',
+      title: 'Polling Desa',
+      subtitle: 'Rembug aspirasi',
+      category: 'Sosial & Aspirasi',
+      icon: Vote,
+      screen: 'polling',
+      defaultUsage: 640,
+      bg: isWireframe ? 'bg-zinc-100 text-zinc-900 border border-zinc-300' : 'bg-red-50 text-red-600 border border-red-100',
+      badge: 'Baru',
+      description: 'Musyawarah & rembug suara warga untuk prioritas program pembangunan desa.',
+    },
+    {
+      id: 'antar_barang',
+      title: 'Antar Barang',
+      subtitle: 'Titip & kirim cepat',
+      category: 'Transportasi',
+      icon: PackageCheck,
+      screen: 'ojek_becak',
+      defaultUsage: 590,
+      bg: isWireframe ? 'bg-zinc-100 text-zinc-900 border border-zinc-300' : 'bg-orange-50 text-orange-600 border border-orange-100',
+      badge: 'Kurir',
+      description: 'Titip belanjaan pasar atau kirim dokumen & paket kilat langsung ke rumah.',
     },
     {
       id: 'info_desa',
       title: 'Info Desa',
       subtitle: 'Balai desa & surat',
+      category: 'Sosial & Aspirasi',
       icon: Landmark,
-      screen: 'komunitas' as ScreenId,
+      screen: 'komunitas',
+      defaultUsage: 520,
       bg: isWireframe ? 'bg-zinc-100 text-zinc-900 border border-zinc-300' : 'bg-blue-50 text-blue-600 border border-blue-100',
       badge: 'Resmi',
-    },
-  ];
-
-  // Optional requested menu icons
-  const optionalServices = [
-    {
-      id: 'polling_desa',
-      title: 'Polling Desa',
-      subtitle: 'Rembug aspirasi',
-      icon: Vote,
-      screen: 'polling' as ScreenId,
-      bg: isWireframe ? 'bg-zinc-100 text-zinc-900 border border-zinc-300' : 'bg-red-50 text-red-600 border border-red-100',
-      badge: 'Baru',
-    },
-    {
-      id: 'antar_barang',
-      title: 'Antar Barang',
-      subtitle: 'Titip & kirim',
-      icon: PackageCheck,
-      screen: 'ojek_becak' as ScreenId,
-      bg: isWireframe ? 'bg-zinc-100 text-zinc-900 border border-zinc-300' : 'bg-orange-50 text-orange-600 border border-orange-100',
+      description: 'Layanan administrasi surat pengantar RT/RW dan pengumuman resmi balai desa.',
     },
     {
       id: 'chat_lokal',
       title: 'Chat Lokal',
       subtitle: 'Obrolan warga',
+      category: 'Sosial & Aspirasi',
       icon: MessageCircle,
-      screen: 'komunitas' as ScreenId,
+      screen: 'komunitas',
+      defaultUsage: 430,
       bg: isWireframe ? 'bg-zinc-100 text-zinc-900 border border-zinc-300' : 'bg-teal-50 text-teal-600 border border-teal-100',
+      description: 'Forum obrolan warga se-blok, kabar keamanan ronda malam & gotong royong.',
     },
     {
       id: 'event_budaya',
       title: 'Event & Budaya',
       subtitle: 'Sintren & wayang',
+      category: 'Sosial & Aspirasi',
       icon: CalendarDays,
-      screen: 'komunitas' as ScreenId,
+      screen: 'komunitas',
+      defaultUsage: 380,
       bg: isWireframe ? 'bg-zinc-100 text-zinc-900 border border-zinc-300' : 'bg-yellow-50 text-yellow-700 border border-yellow-100',
-    },
-    {
-      id: 'hall_of_fame',
-      title: 'Hall of Fame',
-      subtitle: 'Tokoh & Prestasi',
-      icon: Trophy,
-      screen: 'hall_of_fame' as ScreenId,
-      bg: isWireframe ? 'bg-zinc-100 text-zinc-900 border border-zinc-300' : 'bg-amber-50 text-amber-800 border border-amber-200',
-      badge: 'Tokoh',
+      badge: 'Budaya',
+      description: 'Jadwal pentas tari sintren, wayang kulit, sedekah bumi & festival seni daerah.',
     },
   ];
+
+  // Map Default Usage
+  const DEFAULT_SERVICE_USAGES = useMemo(() => {
+    const map: Record<string, number> = {};
+    ALL_VILLAGE_SERVICES.forEach((s) => {
+      map[s.id] = s.defaultUsage;
+    });
+    return map;
+  }, []);
+
+  // State Dinamis Frekuensi Penggunaan (Disimpan di localStorage)
+  const [serviceUsageMap, setServiceUsageMap] = useState<Record<string, number>>(() => {
+    try {
+      const saved = localStorage.getItem('wong_arjawinangun_service_usage_v3');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return { ...DEFAULT_SERVICE_USAGES, ...parsed };
+      }
+    } catch (e) {
+      // fallback
+    }
+    return { ...DEFAULT_SERVICE_USAGES };
+  });
+
+  // Urutkan semua layanan secara dinamis dari yang paling sering digunakan (Descending)
+  const sortedAllServices = useMemo(() => {
+    return [...ALL_VILLAGE_SERVICES].sort((a, b) => {
+      const countA = serviceUsageMap[a.id] ?? a.defaultUsage;
+      const countB = serviceUsageMap[b.id] ?? b.defaultUsage;
+      return countB - countA;
+    });
+  }, [serviceUsageMap, isWireframe]);
+
+  // 7 Teratas untuk ditampilkan di grid beranda
+  const top7Services = useMemo(() => sortedAllServices.slice(0, 7), [sortedAllServices]);
+
+  // Selebihnya (mulai urutan ke-8 dst) yang masuk ke tombol "Lainnya"
+  const remainingServices = useMemo(() => sortedAllServices.slice(7), [sortedAllServices]);
+
+  // Handler saat layanan diklik: frekuensi otomatis bertambah & tersimpan secara dinamis
+  const handleServiceClick = (item: VillageServiceItem, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const currentCount = serviceUsageMap[item.id] ?? item.defaultUsage;
+    const newCount = currentCount + 1;
+    const updatedMap = {
+      ...serviceUsageMap,
+      [item.id]: newCount,
+    };
+    setServiceUsageMap(updatedMap);
+    try {
+      localStorage.setItem('wong_arjawinangun_service_usage_v3', JSON.stringify(updatedMap));
+    } catch (err) {
+      // ignore
+    }
+
+    setServiceFeedbackToast({
+      title: item.title,
+      count: newCount,
+    });
+    setTimeout(() => {
+      setServiceFeedbackToast(null);
+    }, 2800);
+
+    onNavigate(item.screen);
+  };
+
+  // Handler untuk mensimulasikan penggunaan / boost frekuensi layanan
+  const handleBoostService = (serviceId: string, delta: number = 50, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const currentCount = serviceUsageMap[serviceId] ?? DEFAULT_SERVICE_USAGES[serviceId] ?? 100;
+    const newCount = currentCount + delta;
+    const updatedMap = {
+      ...serviceUsageMap,
+      [serviceId]: newCount,
+    };
+    setServiceUsageMap(updatedMap);
+    try {
+      localStorage.setItem('wong_arjawinangun_service_usage_v3', JSON.stringify(updatedMap));
+    } catch (err) {}
+
+    const svc = ALL_VILLAGE_SERVICES.find((s) => s.id === serviceId);
+    setServiceFeedbackToast({
+      title: svc ? svc.title : 'Layanan',
+      count: newCount,
+      promoted: true,
+    });
+    setTimeout(() => {
+      setServiceFeedbackToast(null);
+    }, 2800);
+  };
+
+  // Reset frekuensi ke pengaturan awal desa
+  const handleResetServiceUsage = () => {
+    setServiceUsageMap({ ...DEFAULT_SERVICE_USAGES });
+    try {
+      localStorage.removeItem('wong_arjawinangun_service_usage_v3');
+    } catch (err) {}
+    setServiceFeedbackToast({
+      title: 'Urutan Layanan',
+      count: 0,
+    });
+    setTimeout(() => {
+      setServiceFeedbackToast(null);
+    }, 2500);
+  };
 
   return (
     <div className={`min-h-full pb-20 ${isWireframe ? 'bg-zinc-50' : 'bg-slate-50'}`}>
@@ -240,6 +414,22 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 
           {/* User Profile Avatar with Verification Badge & Keluar Button */}
           <div className="flex items-center gap-1.5">
+            {onOpenNotifications && (
+              <button
+                type="button"
+                onClick={onOpenNotifications}
+                className="w-8 h-8 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition-all relative border border-white/20 active:scale-95"
+                title="Pusat Notifikasi Warga"
+              >
+                <Bell size={15} />
+                {unreadNotificationsCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-amber-400 text-red-950 text-[10px] font-black flex items-center justify-center shadow-xs">
+                    {unreadNotificationsCount}
+                  </span>
+                )}
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() => onNavigate('profil')}
@@ -318,16 +508,85 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
           )}
         </div>
 
-        {/* Search Bar */}
+        {/* Search Bar with live service matching */}
         <div className="relative mb-2.5">
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cari kebutuhan warga, pasar, & armada..."
-            className="w-full pl-9 pr-4 py-2.5 bg-white text-slate-800 placeholder-slate-400 rounded-xl text-xs font-medium shadow-xs focus:outline-none focus:ring-2 focus:ring-amber-300 transition-all"
+            placeholder="Cari layanan desa, pasar, info & armada..."
+            className="w-full pl-9 pr-8 py-2.5 bg-white text-slate-800 placeholder-slate-400 rounded-xl text-xs font-medium shadow-xs focus:outline-none focus:ring-2 focus:ring-amber-300 transition-all"
           />
           <Search size={15} className="absolute left-3 top-3 text-slate-400" />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2.5 top-2.5 p-0.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+            >
+              <X size={13} />
+            </button>
+          )}
+
+          {/* Quick Service Match Dropdown */}
+          {searchQuery.trim().length > 0 && (() => {
+            const matches = ALL_VILLAGE_SERVICES.filter(
+              (s) =>
+                s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                s.subtitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                s.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                s.category.toLowerCase().includes(searchQuery.toLowerCase())
+            );
+            if (matches.length === 0) return null;
+            return (
+              <div className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-xl shadow-xl border border-slate-200 p-2 z-30 text-left max-h-56 overflow-y-auto">
+                <div className="flex items-center justify-between px-2 py-1 border-b border-slate-100 mb-1">
+                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                    Layanan Terkait ({matches.length})
+                  </span>
+                  <span className="text-[9px] text-slate-400">Klik untuk membuka</span>
+                </div>
+                <div className="space-y-1">
+                  {matches.map((item) => {
+                    const Icon = item.icon;
+                    const count = serviceUsageMap[item.id] ?? item.defaultUsage;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={(e) => {
+                          setSearchQuery('');
+                          handleServiceClick(item, e);
+                        }}
+                        className="w-full p-2 rounded-lg hover:bg-slate-50 flex items-center justify-between text-left transition-colors group"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${item.bg}`}>
+                            <Icon size={16} />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs font-bold text-slate-900 group-hover:text-red-700 truncate">
+                                {item.title}
+                              </span>
+                              <span className="text-[9px] bg-slate-100 text-slate-600 px-1 py-0.2 rounded shrink-0">
+                                {item.category}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-slate-400 truncate">{item.subtitle}</p>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0 ml-2">
+                          <span className="text-[10px] font-bold text-red-700">Buka →</span>
+                          <span className="text-[8px] text-slate-400 block">{count}x</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Location selector & GPS Detection */}
@@ -361,437 +620,221 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         </div>
       </div>
 
-      {/* PENGGANTI DOMPET: Kartu Penilaian Rating (Integritas & Layanan) Setiap Orang */}
-      <div className="px-4 -mt-2.5">
-        <div className="bg-white rounded-2xl p-3.5 border border-slate-200/90 shadow-sm text-left">
-          <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center shrink-0">
-                <Award size={18} />
-              </div>
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] font-black text-slate-900">
-                    Penilaian & Reputasi Warga
-                  </span>
-                  <span className="text-[9px] bg-amber-100 text-amber-900 font-extrabold px-1.5 py-0.2 rounded-full">
-                    {activeUser.reputationBadge || 'Warga Terpercaya'}
-                  </span>
-                </div>
-                <p className="text-[10px] text-slate-400">
-                  {activeUser.totalReviewsCount || 34} Ulasan dari Warga & Pedagang
-                </p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setShowRatingModal(true)}
-              className="text-[10px] font-bold text-red-700 hover:text-red-800 bg-red-50 hover:bg-red-100 px-2 py-1 rounded-lg transition-colors flex items-center gap-0.5"
-            >
-              <span>Detail</span>
-              <ChevronRight size={12} />
-            </button>
-          </div>
-
-          {/* Dual Rating Score: Integritas & Layanan */}
-          <div className="grid grid-cols-2 gap-2 pt-2.5">
-            {/* 1. Rating Integritas */}
-            <div
-              onClick={() => setShowRatingModal(true)}
-              className="p-2 bg-gradient-to-br from-slate-50 to-amber-50/40 rounded-xl border border-slate-100 cursor-pointer hover:border-amber-200 transition-colors"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-slate-500">Integritas</span>
-                <span className="text-amber-500 text-[10px]">★★★★★</span>
-              </div>
-              <div className="flex items-baseline gap-1 mt-0.5">
-                <span className="text-sm font-black text-slate-900 tabular-nums">
-                  {activeUser.integrityRating ? activeUser.integrityRating.toFixed(2) : '4.95'}
-                </span>
-                <span className="text-[10px] text-slate-400">/ 5.0</span>
-              </div>
-              <span className="text-[9px] text-emerald-700 font-semibold block truncate mt-0.5">
-                Kejujuran & Amanah
-              </span>
-            </div>
-
-            {/* 2. Rating Layanan */}
-            <div
-              onClick={() => setShowRatingModal(true)}
-              className="p-2 bg-gradient-to-br from-slate-50 to-red-50/40 rounded-xl border border-slate-100 cursor-pointer hover:border-red-200 transition-colors"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-slate-500">Layanan</span>
-                <span className="text-amber-500 text-[10px]">★★★★★</span>
-              </div>
-              <div className="flex items-baseline gap-1 mt-0.5">
-                <span className="text-sm font-black text-slate-900 tabular-nums">
-                  {activeUser.serviceRating ? activeUser.serviceRating.toFixed(2) : '4.88'}
-                </span>
-                <span className="text-[10px] text-slate-400">/ 5.0</span>
-              </div>
-              <span className="text-[9px] text-rose-700 font-semibold block truncate mt-0.5">
-                Keramahan & Kualitas
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* LAYANAN UTAMA WARGA: QRIS DONASI & INFAQ DESA */}
-      <div className="px-4 mt-3">
-        <div
-          onClick={() => onNavigate('qris_donasi')}
-          className="bg-gradient-to-r from-red-700 via-rose-700 to-red-800 rounded-2xl p-3 text-white shadow-sm flex items-center justify-between cursor-pointer hover:shadow-md transition-all active:scale-[0.99] border border-red-900/30 group"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center shrink-0 text-amber-300">
-              <HeartHandshake size={22} />
-            </div>
-            <div className="text-left">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] font-black uppercase tracking-wider text-amber-300">
-                  Layanan Utama Warga
-                </span>
-                <span className="text-[9px] bg-red-900/90 text-red-100 px-1.5 py-0.2 rounded font-bold">
-                  QRIS Resmi
-                </span>
-              </div>
-              <h3 className="text-xs font-bold text-white leading-tight mt-0.5">
-                QRIS Donasi & Infaq Desa Arjawinangun
-              </h3>
-              <p className="text-[10px] text-red-100 mt-0.5">
-                Infaq masjid, santunan yatim & kas siaga desa
-              </p>
-            </div>
-          </div>
-          <div className="p-1.5 rounded-lg bg-white/10 group-hover:bg-white/20 transition-colors">
-            <ChevronRight size={16} className="text-white" />
-          </div>
-        </div>
-      </div>
-
-      {/* Main Services Grid */}
-      <div className="px-4 mt-4">
+      {/* Dynamic Services Grid: 7 Teratas Berdasarkan Frekuensi Penggunaan + 1 Slot "Lainnya" */}
+      <div className="px-4 mt-3 text-left">
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-700">
-            Layanan Utama Warga
-          </h2>
-          <span className="text-[10px] text-slate-500">Arjawinangun & Sekitar</span>
+          <div>
+            <div className="flex items-center gap-1.5">
+              <h2 className="text-xs font-black uppercase tracking-wider text-slate-800">
+                Layanan Warga
+              </h2>
+              <span className="text-[9px] bg-red-100 text-red-700 font-extrabold px-1.5 py-0.2 rounded-full flex items-center gap-0.5 border border-red-200">
+                <Flame size={10} className="text-red-600 fill-red-600" />
+                7 Terpopuler
+              </span>
+            </div>
+            <p className="text-[10px] text-slate-500 mt-0.5">
+              Urutan dinamis otomatis sesuai yang paling sering digunakan warga
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowAllServicesModal(true)}
+            className="text-[10px] font-bold text-red-700 hover:text-red-800 flex items-center gap-0.5 bg-red-50 hover:bg-red-100 px-2 py-1 rounded-lg transition-colors border border-red-100 cursor-pointer"
+          >
+            <span>Semua (13)</span>
+            <ChevronRight size={12} />
+          </button>
         </div>
 
-        {/* 4-column or 3-column layout matching native mobile apps */}
+        {/* 4-column layout (2 rows = 8 slots): 7 Layanan Teratas + 1 Slot "Lainnya" */}
         <div className="grid grid-cols-4 gap-2.5">
-          {mainServices.map((item) => {
+          {top7Services.map((item, index) => {
             const Icon = item.icon;
+            const usageCount = serviceUsageMap[item.id] ?? item.defaultUsage;
             return (
               <button
                 key={item.id}
                 type="button"
-                onClick={() => onNavigate(item.screen)}
-                className="flex flex-col items-center text-center p-2 rounded-xl bg-white border border-slate-100 hover:border-slate-300 shadow-2xs hover:shadow-xs transition-all group active:scale-95"
+                onClick={(e) => handleServiceClick(item, e)}
+                className="relative flex flex-col items-center text-center p-2 rounded-xl bg-white border border-slate-100 hover:border-red-200 shadow-2xs hover:shadow-xs transition-all group active:scale-95 cursor-pointer"
+                title={`${item.title} — ${usageCount.toLocaleString('id-ID')} kali digunakan (Peringkat #${index + 1})`}
               >
-                <div className={`w-11 h-11 rounded-xl flex items-center justify-center mb-1.5 transition-transform group-hover:scale-105 ${item.bg}`}>
+                {/* Ranking Indicator Badge */}
+                <span className="absolute top-1 left-1 text-[8px] font-black text-slate-400 bg-slate-50 px-1 py-0.2 rounded border border-slate-100">
+                  #{index + 1}
+                </span>
+
+                <div className={`w-11 h-11 rounded-xl flex items-center justify-center mb-1.5 transition-transform group-hover:scale-105 shadow-2xs ${item.bg}`}>
                   <Icon size={22} />
                 </div>
                 <span className="text-[11px] font-bold text-slate-800 leading-tight line-clamp-2">
                   {item.title}
                 </span>
-                {item.badge && (
-                  <span className="mt-1 text-[9px] font-bold text-red-700 bg-red-50 px-1 rounded">
+                {item.badge ? (
+                  <span className="mt-1 text-[8px] font-bold text-red-700 bg-red-50 px-1 py-0.2 rounded border border-red-100">
                     {item.badge}
+                  </span>
+                ) : (
+                  <span className="mt-1 text-[8px] font-medium text-slate-400">
+                    {usageCount > 999 ? `${(usageCount / 1000).toFixed(1)}k` : usageCount}x
                   </span>
                 )}
               </button>
             );
           })}
-        </div>
 
-        {/* Toggleable Optional Services */}
-        <div className="mt-3 bg-white/70 p-3 rounded-xl border border-slate-200/70">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-1.5">
-              <Sparkles size={13} className="text-amber-500" />
-              <span className="text-[11px] font-bold text-slate-700">Layanan Tambahan Desa</span>
+          {/* 8th Slot: "Lainnya" Button */}
+          <button
+            type="button"
+            onClick={() => setShowAllServicesModal(true)}
+            className="flex flex-col items-center text-center p-2 rounded-xl bg-gradient-to-b from-slate-50 to-red-50/50 border-2 border-dashed border-red-200 hover:border-red-400 shadow-2xs hover:shadow-xs transition-all group active:scale-95 text-slate-800 cursor-pointer"
+            title={`Buka ${remainingServices.length} layanan lainnya di Arjawinangun`}
+          >
+            <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-1.5 bg-red-600 text-white group-hover:bg-red-700 group-hover:scale-105 transition-all shadow-xs">
+              <LayoutGrid size={22} />
             </div>
-            <button
-              type="button"
-              onClick={() => setShowOptionalIcons(!showOptionalIcons)}
-              className="text-[10px] font-bold text-red-700 hover:underline"
-            >
-              {showOptionalIcons ? 'Sembunyikan' : 'Tampilkan'}
-            </button>
-          </div>
-
-          {showOptionalIcons && (
-            <div className="grid grid-cols-4 gap-2 pt-1">
-              {optionalServices.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => onNavigate(item.screen)}
-                    className="flex flex-col items-center text-center p-1.5 rounded-lg hover:bg-white transition-all active:scale-95"
-                  >
-                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center mb-1 ${item.bg}`}>
-                      <Icon size={18} />
-                    </div>
-                    <span className="text-[10px] font-semibold text-slate-700 leading-tight">
-                      {item.title}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
+            <span className="text-[11px] font-black text-red-900 leading-tight">
+              Lainnya
+            </span>
+            <span className="mt-1 text-[8px] font-black text-red-700 bg-red-100 px-1.5 py-0.2 rounded-full border border-red-200">
+              +{remainingServices.length} Menu
+            </span>
+          </button>
         </div>
       </div>
 
-      {/* Promo Spesial Banner (Matching user screenshot) */}
-      <div className="px-4 mt-4">
+      {/* Sorotan Cepat: QRIS Infaq & Hall of Fame (Clean 2-Column Cards) */}
+      <div className="px-4 mt-3 grid grid-cols-2 gap-2 text-left">
+        {/* Card 1: QRIS Donasi */}
+        <div
+          onClick={() => onNavigate('qris_donasi')}
+          className="p-3 bg-gradient-to-br from-red-700 to-rose-800 text-white rounded-2xl shadow-2xs cursor-pointer hover:shadow-sm transition-all active:scale-[0.99] group border border-red-900/40"
+        >
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[9px] font-black bg-white/20 text-amber-200 px-1.5 py-0.2 rounded uppercase tracking-wider">
+              QRIS Resmi
+            </span>
+            <HeartHandshake size={15} className="text-amber-300" />
+          </div>
+          <h3 className="text-xs font-bold leading-tight mt-1 text-white">
+            Infaq & Kas Desa
+          </h3>
+          <p className="text-[10px] text-red-100 mt-0.5 line-clamp-1">
+            Masjid, yatim & kas darurat
+          </p>
+          <span className="inline-flex items-center gap-0.5 text-[9px] font-extrabold text-amber-300 mt-1.5 group-hover:translate-x-0.5 transition-transform">
+            <span>Beri Donasi</span>
+            <ArrowRight size={10} />
+          </span>
+        </div>
+
+        {/* Card 2: Hall of Fame */}
+        <div
+          onClick={() => onNavigate('hall_of_fame')}
+          className="p-3 bg-gradient-to-br from-amber-600 to-rose-700 text-white rounded-2xl shadow-2xs cursor-pointer hover:shadow-sm transition-all active:scale-[0.99] group border border-amber-500/40"
+        >
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[9px] font-black bg-black/20 text-amber-200 px-1.5 py-0.2 rounded uppercase tracking-wider">
+              Apresiasi
+            </span>
+            <Trophy size={15} className="text-amber-300" />
+          </div>
+          <h3 className="text-xs font-bold leading-tight mt-1 text-white">
+            Hall of Fame
+          </h3>
+          <p className="text-[10px] text-amber-100 mt-0.5 line-clamp-1">
+            Tokoh, pemuda & usulan warga
+          </p>
+          <span className="inline-flex items-center gap-0.5 text-[9px] font-extrabold text-amber-200 mt-1.5 group-hover:translate-x-0.5 transition-transform">
+            <span>Usulkan Tokoh</span>
+            <ArrowRight size={10} />
+          </span>
+        </div>
+      </div>
+
+      {/* Akses Cepat Pasar Jungjang & Jasa Siaga (Clean 2-Column Links) */}
+      <div className="px-4 mt-2.5 grid grid-cols-2 gap-2 text-left">
         <div
           onClick={() => onNavigate('belanja_offline')}
-          className="relative rounded-2xl overflow-hidden cursor-pointer shadow-sm group border border-slate-200"
+          className="p-2.5 bg-white rounded-2xl border border-slate-200/90 shadow-2xs hover:border-red-200 transition-all cursor-pointer flex items-center justify-between group"
         >
-          {/* Real Photo Asset */}
-          <div className="h-28 w-full bg-slate-200 relative overflow-hidden">
-            <img
-              src={APP_IMAGES.promoPasar}
-              alt="Promo Pasar Tradisional"
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-              referrerPolicy="no-referrer"
-            />
-            <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/60 to-transparent flex flex-col justify-center p-3.5 text-left text-white">
-              <span className="inline-block bg-amber-400 text-red-950 text-[10px] font-extrabold px-2 py-0.5 rounded-full w-fit mb-1 uppercase tracking-wider">
-                Promo Spesial!
-              </span>
-              <h3 className="text-xs font-bold leading-snug max-w-[210px] text-white">
-                Diskon Belanja Pasar Tradisional Hemat hingga 50%
-              </h3>
-              <p className="text-[10px] text-amber-200 mt-0.5">
-                Kios Mbak Siti & Los Sayur Pasar Jungjang
-              </p>
-              <div className="mt-2">
-                <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-red-600 hover:bg-red-700 text-white px-2.5 py-1 rounded-lg">
-                  Lihat Promo →
-                </span>
-              </div>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-sky-50 text-sky-700 flex items-center justify-center shrink-0">
+              <ShoppingBag size={16} />
             </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Two Column Layout matching screenshot: Tukang di Sekitar & Kuliner Terdekat */}
-      <div className="px-4 mt-4 grid grid-cols-2 gap-2.5 text-left">
-        {/* Tukang di Sekitar */}
-        <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-xs font-bold text-slate-800">Tukang di Sekitar</h3>
-            <button
-              onClick={() => onNavigate('jasa_lokal')}
-              className="text-[10px] text-red-700 font-semibold hover:underline"
-            >
-              Semua
-            </button>
-          </div>
-
-          <div className="space-y-2">
-            {LOCAL_SERVICES.slice(0, 2).map((srv) => (
-              <div
-                key={srv.id}
-                onClick={() => onNavigate('jasa_lokal')}
-                className="p-1.5 rounded-xl bg-slate-50 hover:bg-red-50/50 border border-slate-100 transition-colors cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 bg-amber-100 flex items-center justify-center">
-                    <img
-                      src={srv.avatar}
-                      alt={srv.name}
-                      className="w-full h-full object-cover"
-                      referrerPolicy="no-referrer"
-                    />
-                  </div>
-                  <div className="overflow-hidden min-w-0">
-                    <p className="text-[11px] font-bold text-slate-900 truncate">{srv.name}</p>
-                    <p className="text-[9px] text-slate-500 truncate">{srv.trade}</p>
-                    <div className="flex items-center gap-1 text-[9px] text-emerald-600 font-medium">
-                      <span>✓ Siap</span>
-                      <span>·</span>
-                      <span>{srv.distance}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Kuliner Terdekat */}
-        <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-xs font-bold text-slate-800">Kuliner Terdekat</h3>
-            <button
-              onClick={() => onNavigate('belanja_offline')}
-              className="text-[10px] text-red-700 font-semibold hover:underline"
-            >
-              Semua
-            </button>
-          </div>
-
-          <div className="space-y-2">
-            <div
-              onClick={() => onNavigate('belanja_offline')}
-              className="p-1.5 rounded-xl bg-slate-50 hover:bg-rose-50/50 border border-slate-100 transition-colors cursor-pointer"
-            >
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 bg-rose-100">
-                  <img
-                    src={APP_IMAGES.kulinerCirebon}
-                    alt="Kuliner"
-                    className="w-full h-full object-cover"
-                    referrerPolicy="no-referrer"
-                  />
-                </div>
-                <div className="overflow-hidden min-w-0">
-                  <p className="text-[11px] font-bold text-slate-900 truncate">Empal Gentong</p>
-                  <p className="text-[9px] text-slate-500">Yu Wasminah</p>
-                  <div className="flex items-center gap-1 text-[9px] text-slate-700 font-bold">
-                    <span className="text-amber-500">★ 4.9</span>
-                    <span>·</span>
-                    <span className="text-red-700">Rp 25 rb</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div
-              onClick={() => onNavigate('belanja_offline')}
-              className="p-1.5 rounded-xl bg-slate-50 hover:bg-rose-50/50 border border-slate-100 transition-colors cursor-pointer"
-            >
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 bg-amber-100 flex items-center justify-center text-xs">
-                  🍧
-                </div>
-                <div className="overflow-hidden min-w-0">
-                  <p className="text-[11px] font-bold text-slate-900 truncate">Es Campur Bu Ani</p>
-                  <p className="text-[9px] text-slate-500">Pasar Jungjang</p>
-                  <div className="flex items-center gap-1 text-[9px] text-slate-700 font-bold">
-                    <span className="text-amber-500">★ 4.8</span>
-                    <span>·</span>
-                    <span className="text-red-700">Rp 8 rb</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Polling Aspirasi Warga Terkini Highlight Card */}
-      {latestActivePoll && (
-        <div className="px-4 mt-4 text-left">
-          <div className="p-3.5 bg-gradient-to-r from-red-50 via-rose-50 to-amber-50 rounded-2xl border border-red-200/90 shadow-2xs space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <div className="w-6 h-6 rounded-lg bg-red-600 text-white flex items-center justify-center">
-                  <Vote size={13} />
-                </div>
-                <span className="text-[10px] font-extrabold uppercase text-red-900 tracking-wider">
-                  Rembug & Polling Warga Aktif
-                </span>
-              </div>
-              <span className="text-[9px] bg-red-100 text-red-800 font-bold px-1.5 py-0.2 rounded-full">
-                {latestActivePoll.category}
-              </span>
-            </div>
-
             <div>
-              <h4 className="text-xs font-black text-slate-900 line-clamp-1">
-                {latestActivePoll.title}
-              </h4>
-              <p className="text-[10px] text-slate-600 line-clamp-2 mt-0.5">
-                {latestActivePoll.description}
-              </p>
+              <h4 className="text-xs font-bold text-slate-800 leading-tight">Pasar Jungjang</h4>
+              <p className="text-[9px] text-slate-400">Sayur & sembako segar</p>
             </div>
+          </div>
+          <ChevronRight size={13} className="text-slate-400 group-hover:text-red-600 transition-colors" />
+        </div>
 
-            <div className="flex items-center justify-between pt-1 border-t border-red-100/80">
-              <span className="text-[10px] text-slate-500 font-semibold">
-                {latestActivePoll.totalVotes} warga berpartisipasi
-              </span>
-              <button
-                type="button"
-                onClick={() => onNavigate('polling')}
-                className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white font-bold text-[10px] rounded-lg transition-colors flex items-center gap-1"
-              >
-                <span>Ikut Polling</span>
-                <ArrowRight size={11} />
-              </button>
+        <div
+          onClick={() => onNavigate('jasa_lokal')}
+          className="p-2.5 bg-white rounded-2xl border border-slate-200/90 shadow-2xs hover:border-amber-200 transition-all cursor-pointer flex items-center justify-between group"
+        >
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center shrink-0">
+              <Wrench size={16} />
             </div>
+            <div>
+              <h4 className="text-xs font-bold text-slate-800 leading-tight">Jasa Siaga</h4>
+              <p className="text-[9px] text-slate-400">Tukang listrik & ledeng</p>
+            </div>
+          </div>
+          <ChevronRight size={13} className="text-slate-400 group-hover:text-amber-600 transition-colors" />
+        </div>
+      </div>
+
+      {/* Polling Warga Aktif Highlight (Ringan & Bersih) */}
+      {latestActivePoll && (
+        <div className="px-4 mt-2.5 text-left">
+          <div
+            onClick={() => onNavigate('polling')}
+            className="p-2.5 bg-gradient-to-r from-red-50 to-amber-50/50 rounded-2xl border border-red-200/80 flex items-center justify-between cursor-pointer hover:border-red-300 transition-all"
+          >
+            <div className="flex items-center gap-2 min-w-0 pr-2">
+              <div className="w-7 h-7 rounded-lg bg-red-600 text-white flex items-center justify-center shrink-0">
+                <Vote size={14} />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[9px] font-black uppercase text-red-900 bg-red-100 px-1.5 py-0.2 rounded">
+                    Rembug Warga
+                  </span>
+                  <span className="text-[9px] text-slate-500 font-semibold truncate">
+                    {latestActivePoll.totalVotes} suara
+                  </span>
+                </div>
+                <h4 className="text-xs font-bold text-slate-900 truncate mt-0.5">
+                  {latestActivePoll.title}
+                </h4>
+              </div>
+            </div>
+            <span className="text-[10px] font-bold text-red-700 shrink-0 flex items-center gap-0.5">
+              <span>Ikut</span>
+              <ArrowRight size={10} />
+            </span>
           </div>
         </div>
       )}
 
-      {/* Hall of Fame & Panggung Kehormatan Desa Card */}
-      <div className="px-4 mt-4 text-left">
-        <div
-          onClick={() => onNavigate('hall_of_fame')}
-          className="p-3.5 bg-gradient-to-r from-amber-600 via-rose-700 to-red-800 text-white rounded-2xl shadow-sm border border-amber-400/40 cursor-pointer hover:shadow-md transition-all group"
-        >
-          <div className="flex items-center justify-between mb-1.5">
-            <div className="flex items-center gap-1.5">
-              <span className="p-1 rounded-lg bg-amber-400 text-red-950 font-black text-xs">
-                🏆
-              </span>
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-200">
-                Panggung Kehormatan Warga
-              </span>
-            </div>
-            <span className="text-[9px] bg-amber-400/30 text-amber-100 font-extrabold px-2 py-0.5 rounded-full border border-amber-300/40">
-              Warga Bisa Mengusulkan
-            </span>
-          </div>
-
-          <h3 className="text-sm font-black text-white leading-tight">
-            Hall of Fame Desa Arjawinangun
-          </h3>
-          <p className="text-[11px] text-amber-100 mt-0.5 leading-snug">
-            Apresiasi Tokoh Masyarakat, Pemuda Inspiratif, Pelajar, Atlet, Pengusaha & Relawan.
-          </p>
-
-          <div className="mt-2.5 pt-2 border-t border-white/20 flex items-center justify-between">
-            <div className="flex items-center gap-1.5 text-[10px] text-amber-200 font-bold">
-              <span>🌟 6 Kategori</span>
-              <span>·</span>
-              <span>❤️ Apresiasi & Testimoni</span>
-            </div>
-            <span className="text-[10px] font-extrabold bg-amber-400 text-red-950 px-2.5 py-1 rounded-lg flex items-center gap-1 group-hover:bg-amber-300 transition-colors">
-              <span>Buka Hall of Fame</span>
-              <ArrowRight size={11} />
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Info Warga & Komunitas Ticker Card */}
-      <div className="px-4 mt-4 text-left">
+      {/* Pengumuman Balai Desa (Compact Ticker) */}
+      <div className="px-4 mt-2 text-left">
         <div
           onClick={() => onNavigate('komunitas')}
-          className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl border border-amber-200 flex items-center justify-between cursor-pointer hover:border-amber-300 transition-colors"
+          className="p-2 bg-slate-100/90 hover:bg-slate-200/80 rounded-xl flex items-center justify-between cursor-pointer transition-colors text-[10px]"
         >
-          <div className="flex items-center gap-2.5">
-            <span className="text-lg">📢</span>
-            <div>
-              <span className="text-[10px] font-extrabold uppercase text-amber-800 tracking-wider">
-                Pengumuman Balai Desa
-              </span>
-              <p className="text-xs font-semibold text-slate-800">
-                Gotong Royong Bersih Selokan Minggu Pagi di Blok Makmur
-              </p>
-            </div>
+          <div className="flex items-center gap-2 truncate pr-2 text-slate-700">
+            <span className="shrink-0">📢</span>
+            <span className="font-bold shrink-0 text-slate-800">Balai Desa:</span>
+            <span className="truncate text-slate-600">
+              Layanan digital desa Arjawinangun aktif & siap melayani kebutuhan warga.
+            </span>
           </div>
-          <ChevronRight size={16} className="text-amber-700 shrink-0" />
+          <ChevronRight size={12} className="text-slate-400 shrink-0" />
         </div>
       </div>
 
@@ -952,6 +995,337 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 type="button"
                 onClick={() => setShowRatingModal(false)}
                 className="py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Toast Feedback Perubahan Frekuensi & Pembukaan Layanan */}
+      {serviceFeedbackToast && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 text-white px-3.5 py-2.5 rounded-2xl shadow-2xl flex items-center gap-2.5 border border-slate-700/80 animate-in fade-in slide-in-from-bottom-3 duration-200 text-xs font-semibold max-w-xs w-[90%] backdrop-blur-md">
+          <div className="w-8 h-8 rounded-xl bg-amber-400 text-red-950 flex items-center justify-center shrink-0 font-black shadow-xs">
+            <Flame size={18} className="fill-red-900" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-white font-black truncate text-xs">
+              {serviceFeedbackToast.title}
+            </p>
+            <p className="text-[10px] text-amber-200 truncate mt-0.5">
+              {serviceFeedbackToast.promoted
+                ? `⚡ Frekuensi bertambah: ${serviceFeedbackToast.count.toLocaleString('id-ID')}x (Urutan diperbarui!)`
+                : serviceFeedbackToast.count > 0
+                ? `Membuka layanan • ${serviceFeedbackToast.count.toLocaleString('id-ID')}x digunakan`
+                : 'Frekuensi dikembalikan ke pengaturan awal desa'}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: SEMUA LAYANAN DESA (MENU LAINNYA) DENGAN URUTAN DINAMIS */}
+      {showAllServicesModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-t-3xl sm:rounded-2xl max-w-lg w-full max-h-[92vh] flex flex-col text-left shadow-2xl overflow-hidden border border-slate-200 animate-in slide-in-from-bottom duration-200">
+            {/* Header Modal */}
+            <div className="p-4 pb-3 bg-gradient-to-r from-red-700 via-rose-700 to-red-800 text-white shrink-0">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center shrink-0">
+                    <LayoutGrid size={20} className="text-amber-300" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-white leading-tight">
+                      Koleksi Lengkap Layanan Desa
+                    </h3>
+                    <p className="text-[11px] text-red-100 font-medium">
+                      13 Layanan Terintegrasi • Urutan Dinamis Frekuensi
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAllServicesModal(false)}
+                  className="w-8 h-8 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition-colors"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Informational Callout: Mekanisme Dinamis */}
+              <div className="bg-black/25 rounded-xl p-2.5 border border-white/10 text-[10px] text-red-100 flex items-start gap-2">
+                <Flame size={14} className="text-amber-300 shrink-0 mt-0.5" />
+                <p className="leading-snug">
+                  <strong className="text-amber-300">7 Teratas Dinamis:</strong> Layanan yang paling sering digunakan otomatis naik ke beranda utama. Layanan selebihnya berada di menu ini dan siap langsung digunakan.
+                </p>
+              </div>
+            </div>
+
+            {/* Search and Category Filter in Modal */}
+            <div className="p-3 border-b border-slate-100 bg-slate-50/70 shrink-0 space-y-2">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={serviceSearchQuery}
+                  onChange={(e) => setServiceSearchQuery(e.target.value)}
+                  placeholder="Cari layanan (misal: ojek, tani, donasi, loker, toko)..."
+                  className="w-full pl-8 pr-7 py-2 bg-white text-slate-800 placeholder-slate-400 rounded-xl text-xs font-medium border border-slate-200 focus:outline-none focus:ring-2 focus:ring-red-400"
+                />
+                <Search size={14} className="absolute left-2.5 top-2.5 text-slate-400" />
+                {serviceSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setServiceSearchQuery('')}
+                    className="absolute right-2.5 top-2.5 p-0.5 text-slate-400 hover:text-slate-600"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+
+              {/* Category Filter Pills */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none text-[11px]">
+                {['Semua', 'Transportasi', 'Belanja & Kuliner', 'Pekerjaan & Usaha', 'Sosial & Aspirasi'].map((cat) => {
+                  const isActive = serviceFilterCategory === cat;
+                  return (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setServiceFilterCategory(cat)}
+                      className={`px-2.5 py-1 rounded-lg font-bold shrink-0 transition-colors ${
+                        isActive
+                          ? 'bg-red-700 text-white shadow-2xs'
+                          : 'bg-white text-slate-600 hover:bg-slate-200/80 border border-slate-200'
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Scrollable List of Services */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {(() => {
+                // Filtered by Category & Search
+                const filteredServices = sortedAllServices.filter((svc) => {
+                  const matchCat =
+                    serviceFilterCategory === 'Semua' || svc.category === serviceFilterCategory;
+                  const matchQuery =
+                    !serviceSearchQuery.trim() ||
+                    svc.title.toLowerCase().includes(serviceSearchQuery.toLowerCase()) ||
+                    svc.subtitle.toLowerCase().includes(serviceSearchQuery.toLowerCase()) ||
+                    svc.description.toLowerCase().includes(serviceSearchQuery.toLowerCase()) ||
+                    svc.category.toLowerCase().includes(serviceSearchQuery.toLowerCase());
+                  return matchCat && matchQuery;
+                });
+
+                if (filteredServices.length === 0) {
+                  return (
+                    <div className="text-center py-10">
+                      <p className="text-xs text-slate-400 font-bold">
+                        Tidak ada layanan yang sesuai dengan "{serviceSearchQuery}"
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setServiceSearchQuery('');
+                          setServiceFilterCategory('Semua');
+                        }}
+                        className="mt-2 text-xs font-bold text-red-700 hover:underline"
+                      >
+                        Reset Pencarian
+                      </button>
+                    </div>
+                  );
+                }
+
+                // Split into:
+                // 1) Services that are outside top 7 (remainingServices)
+                // 2) Services currently in top 7
+                const filteredRemaining = filteredServices.filter((s) =>
+                  remainingServices.some((r) => r.id === s.id)
+                );
+                const filteredTop7 = filteredServices.filter((s) =>
+                  top7Services.some((t) => t.id === s.id)
+                );
+
+                return (
+                  <>
+                    {/* BAGIAN 1: LAYANAN DI KATEGORI "LAINNYA" (PERINGKAT #8 KE ATAS) */}
+                    {filteredRemaining.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                            <h4 className="text-xs font-black uppercase tracking-wider text-slate-800">
+                              Layanan di Kategori "Lainnya" ({filteredRemaining.length})
+                            </h4>
+                          </div>
+                          <span className="text-[10px] text-amber-700 font-bold bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                            Peringkat #{8} — #{ALL_VILLAGE_SERVICES.length}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-500">
+                          Layanan berikut dapat kamu buka langsung. Frekuensinya otomatis meningkat dan akan naik ke 7 Teratas jika sering digunakan.
+                        </p>
+
+                        <div className="grid grid-cols-1 gap-2 pt-1">
+                          {filteredRemaining.map((item) => {
+                            const Icon = item.icon;
+                            const overallRank = sortedAllServices.findIndex((s) => s.id === item.id) + 1;
+                            const usageCount = serviceUsageMap[item.id] ?? item.defaultUsage;
+                            const threshold = serviceUsageMap[top7Services[6]?.id] ?? top7Services[6]?.defaultUsage ?? 750;
+                            const diffToTop7 = Math.max(0, threshold - usageCount + 1);
+
+                            return (
+                              <div
+                                key={item.id}
+                                className="p-3 rounded-2xl bg-white border border-slate-200 hover:border-red-300 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between gap-2.5"
+                              >
+                                <div className="flex items-start gap-3">
+                                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 shadow-2xs ${item.bg}`}>
+                                    <Icon size={22} />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="text-xs font-black text-slate-900">
+                                        {item.title}
+                                      </span>
+                                      <span className="text-[9px] font-extrabold bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded">
+                                        #{overallRank}
+                                      </span>
+                                      <span className="text-[9px] font-bold bg-red-50 text-red-700 px-1.5 py-0.2 rounded border border-red-100">
+                                        {item.category}
+                                      </span>
+                                    </div>
+                                    <p className="text-[11px] text-slate-600 font-medium line-clamp-1 mt-0.5">
+                                      {item.subtitle} — {item.description}
+                                    </p>
+                                    <div className="flex items-center gap-2 mt-1 text-[10px]">
+                                      <span className="font-bold text-slate-700">
+                                        🔥 {usageCount.toLocaleString('id-ID')} kali digunakan
+                                      </span>
+                                      <span className="text-slate-400">·</span>
+                                      <span className="text-amber-700 font-semibold">
+                                        Perlu +{diffToTop7}x untuk tembus 7 Teratas
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                                  <span className="text-[10px] text-slate-500 font-medium">
+                                    Siap digunakan warga
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      setShowAllServicesModal(false);
+                                      handleServiceClick(item, e);
+                                    }}
+                                    className="px-3.5 py-1.5 rounded-xl bg-red-700 hover:bg-red-800 text-white font-black text-xs transition-colors shadow-2xs flex items-center gap-1 active:scale-95"
+                                  >
+                                    <span>Buka Layanan</span>
+                                    <ArrowRight size={12} />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* BAGIAN 2: 7 LAYANAN TERATAS SAAT INI (TAMPIL DI BERANDA) */}
+                    {filteredTop7.length > 0 && (
+                      <div className="space-y-2 pt-2 border-t border-slate-200/80">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <Flame size={14} className="text-red-600 fill-red-600" />
+                            <h4 className="text-xs font-black uppercase tracking-wider text-slate-800">
+                              7 Layanan Teratas (Tampil di Beranda Utama)
+                            </h4>
+                          </div>
+                          <span className="text-[10px] text-red-700 font-extrabold bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">
+                            Peringkat #1 — #7
+                          </span>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          {filteredTop7.map((item) => {
+                            const Icon = item.icon;
+                            const overallRank = sortedAllServices.findIndex((s) => s.id === item.id) + 1;
+                            const usageCount = serviceUsageMap[item.id] ?? item.defaultUsage;
+                            const medal =
+                              overallRank === 1 ? '🥇' : overallRank === 2 ? '🥈' : overallRank === 3 ? '🥉' : `#${overallRank}`;
+
+                            return (
+                              <div
+                                key={item.id}
+                                className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 hover:bg-white transition-colors flex items-center justify-between"
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <span className="text-xs font-black w-6 text-center shrink-0">
+                                    {medal}
+                                  </span>
+                                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 shadow-2xs ${item.bg}`}>
+                                    <Icon size={16} />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-xs font-bold text-slate-900 truncate">
+                                        {item.title}
+                                      </span>
+                                      <span className="text-[9px] bg-red-100 text-red-700 font-bold px-1.5 py-0.2 rounded">
+                                        {item.category}
+                                      </span>
+                                    </div>
+                                    <span className="text-[10px] text-slate-500">
+                                      {usageCount.toLocaleString('id-ID')} kali digunakan
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    setShowAllServicesModal(false);
+                                    handleServiceClick(item, e);
+                                  }}
+                                  className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:border-red-400 text-red-700 font-bold text-[11px] shrink-0 ml-2"
+                                >
+                                  Buka →
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+
+            {/* Modal Bottom Footer Actions */}
+            <div className="p-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={handleResetServiceUsage}
+                className="px-3 py-2 rounded-xl text-slate-600 hover:text-slate-800 text-[11px] font-bold flex items-center gap-1.5 hover:bg-slate-200 transition-colors"
+                title="Kembalikan urutan ranking ke bawaan default desa"
+              >
+                <RotateCcw size={13} />
+                <span>Reset Urutan Default</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowAllServicesModal(false)}
+                className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-black text-xs transition-colors shadow-xs"
               >
                 Tutup
               </button>

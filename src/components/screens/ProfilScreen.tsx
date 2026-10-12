@@ -62,8 +62,8 @@ export const ProfilScreen: React.FC<ProfilScreenProps> = ({
   const [editName, setEditName] = useState(currentUser.name);
   const [editPhone, setEditPhone] = useState(currentUser.emailOrPhone);
   const [editLocation, setEditLocation] = useState(currentUser.location);
-  const [editRtRw, setEditRtRw] = useState(currentUser.rtRw || 'RT 03 / RW 02');
-  const [editNik, setEditNik] = useState(currentUser.nik || '3209141902950005');
+  const [editRtRw, setEditRtRw] = useState(currentUser.rtRw || '');
+  const [editNik, setEditNik] = useState(currentUser.nik || '');
   const [editBio, setEditBio] = useState(currentUser.description || '');
   const [editAvatar, setEditAvatar] = useState(currentUser.avatar);
   const [saveSuccessNotice, setSaveSuccessNotice] = useState<string | null>(null);
@@ -71,7 +71,7 @@ export const ProfilScreen: React.FC<ProfilScreenProps> = ({
 
   // Review Submitting Modal States
   const [showReviewModal, setShowReviewModal] = useState(false);
-  const [targetReviewUser, setTargetReviewUser] = useState('Mang Duloh (Becak Onthel)');
+  const [targetReviewUser, setTargetReviewUser] = useState('Mitra Layanan Desa');
   const [newIntegrityScore, setNewIntegrityScore] = useState(5.0);
   const [newServiceScore, setNewServiceScore] = useState(5.0);
   const [newCommentText, setNewCommentText] = useState('');
@@ -92,8 +92,8 @@ export const ProfilScreen: React.FC<ProfilScreenProps> = ({
     setEditName(currentUser.name);
     setEditPhone(currentUser.emailOrPhone);
     setEditLocation(currentUser.location);
-    setEditRtRw(currentUser.rtRw || 'RT 03 / RW 02');
-    setEditNik(currentUser.nik || '3209141902950005');
+    setEditRtRw(currentUser.rtRw || '');
+    setEditNik(currentUser.nik || '');
     setEditBio(currentUser.description || '');
     setEditAvatar(currentUser.avatar);
     setShowEditModal(true);
@@ -425,31 +425,34 @@ export const ProfilScreen: React.FC<ProfilScreenProps> = ({
               <div className="space-y-3 text-xs">
                 <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                   <span className="text-slate-500">Nama Lengkap</span>
-                  <span className="font-bold text-slate-800">Ageng Prasetyo</span>
+                  <span className="font-bold text-slate-800">{currentUser.name}</span>
                 </div>
                 <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                   <span className="text-slate-500">Nomor WhatsApp</span>
-                  <span className="font-bold text-slate-800">0812-3456-7890</span>
+                  <span className="font-bold text-slate-800">{currentUser.emailOrPhone || 'Belum diisi'}</span>
                 </div>
                 <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                   <span className="text-slate-500">Nomor Induk Kependudukan (NIK)</span>
-                  <span className="font-mono text-slate-800">320914••••••••01</span>
+                  <span className="font-mono text-slate-800">
+                    {currentUser.nik ? `${currentUser.nik.slice(0, 6)}••••••••${currentUser.nik.slice(-2)}` : 'Belum diisi'}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                   <span className="text-slate-500">Dusun / Blok Domisili</span>
-                  <span className="font-bold text-slate-800">Blok Makmur, Arjawinangun</span>
+                  <span className="font-bold text-slate-800">{currentUser.location || 'Arjawinangun'}</span>
                 </div>
                 <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                   <span className="text-slate-500">Status Warga</span>
                   <span className="text-emerald-700 font-bold flex items-center gap-1">
                     <CheckCircle2 size={13} />
-                    <span>Terverifikasi Balai Desa</span>
+                    <span>{currentUser.verifiedBadge || 'Terdaftar Resmi'}</span>
                   </span>
                 </div>
 
                 <button
                   type="button"
-                  className="w-full mt-3 py-2 border border-slate-200 hover:bg-slate-50 rounded-xl text-slate-700 font-bold flex items-center justify-center gap-1.5"
+                  onClick={handleOpenEditModal}
+                  className="w-full mt-3 py-2 border border-slate-200 hover:bg-slate-50 rounded-xl text-slate-700 font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                 >
                   <Edit3 size={13} />
                   <span>Perbarui Data KTP / Alamat</span>
@@ -464,30 +467,40 @@ export const ProfilScreen: React.FC<ProfilScreenProps> = ({
                   <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                     Semua Transaksi Selesai
                   </span>
-                  <span className="text-[10px] text-slate-500">3 Pesanan Terakhir</span>
+                  <span className="text-[10px] text-slate-500">{MOCK_ORDERS.length} Pesanan</span>
                 </div>
 
-                {MOCK_ORDERS.map((ord) => (
-                  <div
-                    key={ord.id}
-                    onClick={() => setSelectedReceipt(ord)}
-                    className="p-3 rounded-xl border border-slate-200/80 hover:border-red-300 hover:bg-red-50/20 transition-all cursor-pointer text-left"
-                  >
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-xs font-bold text-slate-900">{ord.title}</h4>
-                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
-                        {ord.status}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-500 mt-0.5">{ord.subtitle}</p>
-                    <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-slate-100 text-[10px] text-slate-500">
-                      <span>{ord.date} · {ord.paymentMethod}</span>
-                      <strong className="text-red-700 text-xs tabular-nums">
-                        Rp {ord.total.toLocaleString('id-ID')}
-                      </strong>
-                    </div>
+                {MOCK_ORDERS.length === 0 ? (
+                  <div className="p-8 text-center bg-slate-50/80 rounded-2xl border border-dashed border-slate-200">
+                    <span className="text-2xl block mb-1.5">📦</span>
+                    <h5 className="text-xs font-bold text-slate-800">Belum Ada Riwayat Pesanan</h5>
+                    <p className="text-[11px] text-slate-500 mt-0.5 max-w-xs mx-auto">
+                      Pesanan ojek, becak, belanja pasar, atau jasa panggilan Anda akan tercatat otomatis di sini.
+                    </p>
                   </div>
-                ))}
+                ) : (
+                  MOCK_ORDERS.map((ord) => (
+                    <div
+                      key={ord.id}
+                      onClick={() => setSelectedReceipt(ord)}
+                      className="p-3 rounded-xl border border-slate-200/80 hover:border-red-300 hover:bg-red-50/20 transition-all cursor-pointer text-left"
+                    >
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold text-slate-900">{ord.title}</h4>
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+                          {ord.status}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-0.5">{ord.subtitle}</p>
+                      <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-slate-100 text-[10px] text-slate-500">
+                        <span>{ord.date} · {ord.paymentMethod}</span>
+                        <strong className="text-red-700 text-xs tabular-nums">
+                          Rp {ord.total.toLocaleString('id-ID')}
+                        </strong>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             )}
 

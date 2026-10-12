@@ -19,15 +19,21 @@ import {
   X,
   Send,
   User,
-  ShieldCheck,
   Trophy,
   Filter,
   Check,
+  Bell,
+  ShieldCheck,
 } from 'lucide-react';
+import { AppRole } from '../../types';
 
 interface HallOfFameScreenProps {
   onBack: () => void;
   isWireframe?: boolean;
+  userRole?: AppRole;
+  onOpenNotifications?: () => void;
+  unreadNotificationsCount?: number;
+  onSimulateApproval?: (action: 'approve' | 'publish') => void;
 }
 
 const CATEGORIES: { label: string; value: HallOfFameCategory | 'Semua' | 'Usulan Warga'; icon: string; color: string }[] = [
@@ -44,12 +50,17 @@ const CATEGORIES: { label: string; value: HallOfFameCategory | 'Semua' | 'Usulan
 export const HallOfFameScreen: React.FC<HallOfFameScreenProps> = ({
   onBack,
   isWireframe = false,
+  userRole = 'pelanggan',
+  onOpenNotifications,
+  unreadNotificationsCount = 0,
+  onSimulateApproval,
 }) => {
   const [items, setItems] = useState<HallOfFameItem[]>(MOCK_HALL_OF_FAME);
   const [nominations, setNominations] = useState<HallOfFameNomination[]>(MOCK_HALL_OF_FAME_NOMINATIONS);
   const [selectedCategory, setSelectedCategory] = useState<HallOfFameCategory | 'Semua' | 'Usulan Warga'>('Semua');
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
 
   // Detail Modal State
   const [selectedItem, setSelectedItem] = useState<HallOfFameItem | null>(null);
@@ -213,6 +224,51 @@ export const HallOfFameScreen: React.FC<HallOfFameScreenProps> = ({
     }
   };
 
+  const handleApproveNomination = async (nomId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const nom = nominations.find((n) => n.id === nomId);
+    if (!nom) return;
+
+    try {
+      await api.approveHallOfFameNomination(nomId, 'Admin Balai Desa');
+      setNominations((prev) =>
+        prev.map((n) => (n.id === nomId ? { ...n, status: 'Disetujui' } : n))
+      );
+      setActionNotice(
+        `Berhasil menyetujui usulan "${nom.nomineeName}". Notifikasi dalam aplikasi telah dikirimkan ke warga pengusul!`
+      );
+      setTimeout(() => setActionNotice(null), 4500);
+      if (onSimulateApproval) {
+        onSimulateApproval('approve');
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handlePublishNomination = async (nomId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const nom = nominations.find((n) => n.id === nomId);
+    if (!nom) return;
+
+    try {
+      await api.publishHallOfFameNomination(nomId, 'Admin Balai Desa');
+      setNominations((prev) =>
+        prev.map((n) => (n.id === nomId ? { ...n, status: 'Dipublikasikan' } : n))
+      );
+      setActionNotice(
+        `Selamat! "${nom.nomineeName}" telah resmi dipublikasikan ke Galeri Hall of Fame. Notifikasi dalam aplikasi telah dikirimkan ke seluruh warga!`
+      );
+      setTimeout(() => setActionNotice(null), 4500);
+      if (onSimulateApproval) {
+        onSimulateApproval('publish');
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedItem || !commentText.trim()) return;
@@ -326,14 +382,32 @@ export const HallOfFameScreen: React.FC<HallOfFameScreenProps> = ({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setShowNominationModal(true)}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-amber-400 hover:bg-amber-300 text-red-950 font-extrabold text-[11px] shadow-sm active:scale-95 transition-all"
-          >
-            <PlusCircle size={14} className="text-red-950" />
-            <span>Usulkan Tokoh</span>
-          </button>
+          <div className="flex items-center gap-1.5">
+            {onOpenNotifications && (
+              <button
+                type="button"
+                onClick={onOpenNotifications}
+                className="w-8 h-8 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition-all relative border border-white/20 active:scale-95"
+                title="Pusat Notifikasi Warga"
+              >
+                <Bell size={15} />
+                {unreadNotificationsCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-amber-400 text-red-950 text-[10px] font-black flex items-center justify-center shadow-xs">
+                    {unreadNotificationsCount}
+                  </span>
+                )}
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setShowNominationModal(true)}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-amber-400 hover:bg-amber-300 text-red-950 font-extrabold text-[11px] shadow-sm active:scale-95 transition-all"
+            >
+              <PlusCircle size={14} className="text-red-950" />
+              <span>Usulkan Tokoh</span>
+            </button>
+          </div>
         </div>
 
         {/* Hero Banner Intro */}
@@ -434,6 +508,35 @@ export const HallOfFameScreen: React.FC<HallOfFameScreenProps> = ({
         {/* Tab "Usulan Warga" View */}
         {selectedCategory === 'Usulan Warga' ? (
           <div className="space-y-3">
+            {/* Action Notice Alert */}
+            {actionNotice && (
+              <div className="p-3 bg-emerald-100 border border-emerald-300 text-emerald-950 rounded-2xl text-xs font-semibold flex items-center gap-2 animate-in fade-in">
+                <CheckCircle2 size={16} className="text-emerald-700 shrink-0" />
+                <span className="leading-snug">{actionNotice}</span>
+              </div>
+            )}
+
+            {/* Notification Explanatory Banner */}
+            <div className="p-2.5 bg-gradient-to-r from-amber-50 via-rose-50 to-orange-50 rounded-2xl border border-amber-200/80 text-[11px] text-slate-700 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-amber-400 text-red-950 flex items-center justify-center shrink-0">
+                  <Bell size={13} />
+                </div>
+                <span className="leading-snug">
+                  <strong>Notifikasi Otomatis Aktif:</strong> Warga yang mengusulkan akan menerima notifikasi dalam aplikasi ketika usulan disetujui atau dipublikasikan.
+                </span>
+              </div>
+              {onOpenNotifications && (
+                <button
+                  type="button"
+                  onClick={onOpenNotifications}
+                  className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[10px] rounded-lg shrink-0 shadow-2xs transition-all active:scale-95"
+                >
+                  Buka Notifikasi
+                </button>
+              )}
+            </div>
+
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
                 Daftar Usulan Warga Terbaru
@@ -459,69 +562,137 @@ export const HallOfFameScreen: React.FC<HallOfFameScreenProps> = ({
                 </button>
               </div>
             ) : (
-              nominations.map((nom) => (
-                <div
-                  key={nom.id}
-                  className="p-3.5 bg-white rounded-2xl border border-slate-200/90 shadow-2xs hover:border-amber-300 transition-all text-left"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${getCategoryBadgeClass(nom.category)}`}>
-                          {nom.category}
-                        </span>
-                        <span className="text-[10px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
-                          <Clock size={10} />
-                          <span>{nom.status}</span>
-                        </span>
+              nominations.map((nom) => {
+                const isPublished = nom.status === 'Dipublikasikan';
+                const isApproved = nom.status === 'Disetujui';
+
+                return (
+                  <div
+                    key={nom.id}
+                    className={`p-3.5 bg-white rounded-2xl border transition-all text-left ${
+                      isPublished
+                        ? 'border-amber-300 shadow-xs'
+                        : isApproved
+                        ? 'border-emerald-300 shadow-2xs'
+                        : 'border-slate-200/90 shadow-2xs hover:border-amber-300'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${getCategoryBadgeClass(nom.category)}`}>
+                            {nom.category}
+                          </span>
+                          {isPublished ? (
+                            <span className="text-[10px] bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-full font-black flex items-center gap-1">
+                              <Trophy size={10} />
+                              <span>Resmi Masuk Hall of Fame</span>
+                            </span>
+                          ) : isApproved ? (
+                            <span className="text-[10px] bg-emerald-100 text-emerald-900 border border-emerald-300 px-2 py-0.5 rounded-full font-black flex items-center gap-1">
+                              <CheckCircle2 size={10} />
+                              <span>Disetujui Tim Balai Desa</span>
+                            </span>
+                          ) : (
+                            <span className="text-[10px] bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                              <Clock size={10} />
+                              <span>Menunggu Verifikasi</span>
+                            </span>
+                          )}
+                        </div>
+
+                        <h4 className="text-sm font-black text-slate-900 mt-1">
+                          {nom.nomineeName}
+                        </h4>
+                        <p className="text-[11px] font-semibold text-slate-600">
+                          {nom.title}
+                        </p>
                       </div>
-                      <h4 className="text-sm font-black text-slate-900 mt-1">
-                        {nom.nomineeName}
-                      </h4>
-                      <p className="text-[11px] font-semibold text-slate-600">
-                        {nom.title}
-                      </p>
+
+                      <button
+                        type="button"
+                        onClick={() => handleVoteNomination(nom.id)}
+                        className={`flex flex-col items-center justify-center p-2 rounded-xl border transition-all active:scale-95 shrink-0 ${
+                          nom.hasVoted
+                            ? 'bg-rose-50 border-rose-300 text-rose-600'
+                            : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                        }`}
+                        title="Dukung Usulan Ini"
+                      >
+                        <ThumbsUp size={16} className={nom.hasVoted ? 'fill-rose-600' : ''} />
+                        <span className="text-[10px] font-black mt-0.5">
+                          {nom.supportVotes}
+                        </span>
+                        <span className="text-[8px] font-semibold">Dukungan</span>
+                      </button>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => handleVoteNomination(nom.id)}
-                      className={`flex flex-col items-center justify-center p-2 rounded-xl border transition-all active:scale-95 shrink-0 ${
-                        nom.hasVoted
-                          ? 'bg-rose-50 border-rose-300 text-rose-600'
-                          : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                      }`}
-                      title="Dukung Usulan Ini"
-                    >
-                      <ThumbsUp size={16} className={nom.hasVoted ? 'fill-rose-600' : ''} />
-                      <span className="text-[10px] font-black mt-0.5">
-                        {nom.supportVotes}
+                    <div className="mt-2.5 p-2 bg-slate-50 rounded-xl border border-slate-100 text-[11px] text-slate-700">
+                      <p className="font-bold text-slate-800 mb-0.5">Prestasi / Kontribusi:</p>
+                      <p className="leading-relaxed">{nom.achievements}</p>
+                      {nom.reason && (
+                        <p className="mt-1 text-[10px] text-slate-500 italic">
+                          Alasan pengusulan: &ldquo;{nom.reason}&rdquo;
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-500 flex-wrap gap-1">
+                      <span className="flex items-center gap-1">
+                        <MapPin size={11} className="text-slate-400" />
+                        <span>{nom.origin}</span>
                       </span>
-                      <span className="text-[8px] font-semibold">Dukungan</span>
-                    </button>
-                  </div>
+                      <span>
+                        Diusulkan oleh: <strong className="text-slate-700">{nom.proposerName}</strong> ({nom.proposerRtRw})
+                      </span>
+                    </div>
 
-                  <div className="mt-2.5 p-2 bg-slate-50 rounded-xl border border-slate-100 text-[11px] text-slate-700">
-                    <p className="font-bold text-slate-800 mb-0.5">Prestasi / Kontribusi:</p>
-                    <p className="leading-relaxed">{nom.achievements}</p>
-                    {nom.reason && (
-                      <p className="mt-1 text-[10px] text-slate-500 italic">
-                        Alasan pengusulan: &ldquo;{nom.reason}&rdquo;
-                      </p>
-                    )}
-                  </div>
+                    {/* Admin Approval & Notification Dispatch Actions */}
+                    <div className="mt-2.5 pt-2 border-t border-slate-100 bg-slate-50/80 -mx-3.5 -mb-3.5 p-2.5 rounded-b-2xl flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-1 text-[10px] text-slate-500">
+                        <Bell size={11} className="text-amber-600 shrink-0" />
+                        <span className="font-semibold">
+                          {isPublished
+                            ? 'Notifikasi publikasi telah dikirimkan ke warga'
+                            : isApproved
+                            ? 'Notifikasi persetujuan telah dikirimkan ke warga'
+                            : 'Aksi verifikasi & kirim notifikasi warga:'}
+                        </span>
+                      </div>
 
-                  <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-500">
-                    <span className="flex items-center gap-1">
-                      <MapPin size={11} className="text-slate-400" />
-                      <span>{nom.origin}</span>
-                    </span>
-                    <span>
-                      Diusulkan oleh: <strong className="text-slate-700">{nom.proposerName}</strong> ({nom.proposerRtRw})
-                    </span>
+                      <div className="flex items-center gap-1.5 ml-auto">
+                        {!isApproved && !isPublished && (
+                          <button
+                            type="button"
+                            onClick={(e) => handleApproveNomination(nom.id, e)}
+                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded-lg shadow-2xs flex items-center gap-1 transition-all active:scale-95"
+                          >
+                            <CheckCircle2 size={11} />
+                            <span>Setujui Usulan</span>
+                          </button>
+                        )}
+
+                        {!isPublished && (
+                          <button
+                            type="button"
+                            onClick={(e) => handlePublishNomination(nom.id, e)}
+                            className="px-2.5 py-1 bg-gradient-to-r from-amber-500 to-rose-600 hover:opacity-95 text-white font-extrabold text-[10px] rounded-lg shadow-2xs flex items-center gap-1 transition-all active:scale-95"
+                          >
+                            <Trophy size={11} />
+                            <span>Publikasikan ke Galeri</span>
+                          </button>
+                        )}
+
+                        {isPublished && (
+                          <span className="text-[10px] font-black text-amber-800 flex items-center gap-1">
+                            <span>✓ Resmi Terverifikasi Desa</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         ) : (
@@ -537,12 +708,22 @@ export const HallOfFameScreen: React.FC<HallOfFameScreenProps> = ({
             </div>
 
             {filteredItems.length === 0 ? (
-              <div className="p-8 text-center bg-white rounded-2xl border border-slate-200">
-                <span className="text-3xl block mb-2">🔍</span>
-                <p className="text-xs font-bold text-slate-700">Tidak ada tokoh yang cocok</p>
-                <p className="text-[10px] text-slate-500 mt-0.5">
-                  Coba ubah kata kunci pencarian atau kategori.
+              <div className="p-8 text-center bg-white rounded-2xl border border-dashed border-slate-200 space-y-2">
+                <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
+                  <Trophy size={24} />
+                </div>
+                <h4 className="text-xs font-bold text-slate-800">Belum Ada Sosok Teladan Terdaftar</h4>
+                <p className="text-[11px] text-slate-500 max-w-xs mx-auto">
+                  Warga dapat mengusulkan tokoh inspiratif, sesepuh, pemuda berprestasi, atau pegiat seni budaya untuk masuk Galeri Hall of Fame desa.
                 </p>
+                <button
+                  type="button"
+                  onClick={() => setShowNominationModal(true)}
+                  className="mt-1 px-3.5 py-1.5 bg-gradient-to-r from-red-700 to-rose-600 text-white font-bold text-xs rounded-xl shadow-xs transition-opacity hover:opacity-95 cursor-pointer inline-flex items-center gap-1"
+                >
+                  <PlusCircle size={13} />
+                  <span>Usulkan Sosok Teladan Pertama</span>
+                </button>
               </div>
             ) : (
               filteredItems.map((item) => {

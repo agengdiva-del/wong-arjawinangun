@@ -500,37 +500,49 @@ export const QrisDonasiScreen: React.FC<QrisDonasiScreenProps> = ({
             </div>
 
             <div className="space-y-2">
-              {donations.map((dn) => (
-                <div
-                  key={dn.id}
-                  className="bg-white p-3 rounded-2xl border border-slate-200/90 shadow-2xs space-y-1 text-left"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-900">{dn.donorName}</span>
-                    <span className="text-xs font-black text-emerald-700 tabular-nums">
-                      +Rp {dn.amount.toLocaleString('id-ID')}
-                    </span>
+              {donations.length === 0 ? (
+                <div className="bg-white p-8 rounded-2xl border border-dashed border-slate-200 text-center space-y-2">
+                  <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
+                    <HeartHandshake size={24} />
                   </div>
-
-                  <p className="text-[10px] text-slate-500 line-clamp-1">
-                    Untuk: {dn.campaignTitle}
+                  <h4 className="text-xs font-bold text-slate-800">Belum Ada Riwayat Donasi</h4>
+                  <p className="text-[11px] text-slate-500 max-w-xs mx-auto">
+                    Kebaikan dan infaq warga melalui QRIS akan tercatat transparan di sini secara otomatis.
                   </p>
-
-                  {dn.prayer && (
-                    <p className="text-[11px] text-slate-600 bg-slate-50 p-2 rounded-lg italic">
-                      "{dn.prayer}"
-                    </p>
-                  )}
-
-                  <div className="flex items-center justify-between text-[10px] text-slate-400 pt-0.5">
-                    <span className="flex items-center gap-1">
-                      <QrCode size={10} className="text-red-500" />
-                      <span>{dn.paymentMethod}</span>
-                    </span>
-                    <span>{dn.timestamp}</span>
-                  </div>
                 </div>
-              ))}
+              ) : (
+                donations.map((dn) => (
+                  <div
+                    key={dn.id}
+                    className="bg-white p-3 rounded-2xl border border-slate-200/90 shadow-2xs space-y-1 text-left"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-900">{dn.donorName}</span>
+                      <span className="text-xs font-black text-emerald-700 tabular-nums">
+                        +Rp {dn.amount.toLocaleString('id-ID')}
+                      </span>
+                    </div>
+
+                    <p className="text-[10px] text-slate-500 line-clamp-1">
+                      Untuk: {dn.campaignTitle}
+                    </p>
+
+                    {dn.prayer && (
+                      <p className="text-[11px] text-slate-600 bg-slate-50 p-2 rounded-lg italic">
+                        "{dn.prayer}"
+                      </p>
+                    )}
+
+                    <div className="flex items-center justify-between text-[10px] text-slate-400 pt-0.5">
+                      <span className="flex items-center gap-1">
+                        <QrCode size={10} className="text-red-500" />
+                        <span>{dn.paymentMethod}</span>
+                      </span>
+                      <span>{dn.timestamp}</span>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         )}

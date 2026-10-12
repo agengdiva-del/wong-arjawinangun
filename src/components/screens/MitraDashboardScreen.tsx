@@ -29,9 +29,9 @@ export const MitraDashboardScreen: React.FC<MitraDashboardScreenProps> = ({
   isWireframe = false,
 }) => {
   const [isOnline, setIsOnline] = useState(true);
-  const [hasNewOrder, setHasNewOrder] = useState(true);
+  const [hasNewOrder, setHasNewOrder] = useState(false);
   const [orderAccepted, setOrderAccepted] = useState(false);
-  const [earnings, setEarnings] = useState(85000);
+  const [earnings, setEarnings] = useState(0);
 
   const handleAccept = () => {
     setOrderAccepted(true);
@@ -57,7 +57,7 @@ export const MitraDashboardScreen: React.FC<MitraDashboardScreenProps> = ({
           </button>
           <div className="text-center">
             <h2 className="text-sm font-bold truncate">Dashboard Mitra Warga</h2>
-            <span className="text-[10px] text-amber-100">Mang Duloh · Becak No. 14</span>
+            <span className="text-[10px] text-amber-100">Armada Siaga Desa</span>
           </div>
 
           <button
@@ -153,6 +153,19 @@ export const MitraDashboardScreen: React.FC<MitraDashboardScreenProps> = ({
           </div>
         )}
 
+        {/* Standby State */}
+        {isOnline && !hasNewOrder && !orderAccepted && (
+          <div className="bg-white p-6 rounded-2xl border border-dashed border-slate-200 text-center space-y-2">
+            <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
+              <Bike size={24} />
+            </div>
+            <h4 className="text-xs font-bold text-slate-800">Armada Siaga di Pangkalan</h4>
+            <p className="text-[11px] text-slate-500 max-w-xs mx-auto">
+              Aplikasi aktif mencari pesanan antar-jemput warga atau titip belanja Pasar Jungjang.
+            </p>
+          </div>
+        )}
+
         {/* Accepted Order Status */}
         {orderAccepted && (
           <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-300 text-emerald-950 space-y-2">
@@ -192,7 +205,9 @@ export const MitraDashboardScreen: React.FC<MitraDashboardScreenProps> = ({
                 Rp {earnings.toLocaleString('id-ID')}
               </span>
             </div>
-            <span className="text-[9px] text-slate-400 mt-1 block">Dari 6 tarikan & titipan</span>
+            <span className="text-[9px] text-slate-400 mt-1 block">
+              {earnings > 0 ? 'Total pendapatan hari ini' : 'Belum ada tarikan hari ini'}
+            </span>
           </div>
 
         {/* Penilaian Rating (Integritas & Layanan) Warga */}

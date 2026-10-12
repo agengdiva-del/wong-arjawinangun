@@ -214,7 +214,7 @@ export const BantuanKomunitasScreen: React.FC<BantuanKomunitasScreenProps> = ({
             <div className="bg-white p-3 rounded-2xl border border-slate-200 flex items-center justify-between shadow-2xs">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center text-red-700 font-bold text-xs">
-                  AP
+                  <MessageSquare size={14} />
                 </div>
                 <div>
                   <span className="text-xs font-bold text-slate-800 block">Ada kabar atau laporan?</span>
@@ -224,7 +224,7 @@ export const BantuanKomunitasScreen: React.FC<BantuanKomunitasScreenProps> = ({
               <button
                 type="button"
                 onClick={() => setShowNewPostModal(true)}
-                className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl flex items-center gap-1 shadow-2xs"
+                className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
               >
                 <PlusCircle size={13} />
                 <span>Tulis</span>
@@ -233,7 +233,25 @@ export const BantuanKomunitasScreen: React.FC<BantuanKomunitasScreenProps> = ({
 
             {/* List Postingan Warga */}
             <div className="space-y-3">
-              {posts.map((post) => (
+              {posts.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-8 text-center space-y-2">
+                  <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center mx-auto">
+                    <MessageSquare size={24} />
+                  </div>
+                  <h4 className="text-xs font-bold text-slate-800">Belum Ada Postingan Warga</h4>
+                  <p className="text-[11px] text-slate-500 max-w-xs mx-auto">
+                    Jadilah yang pertama berbagi kabar dusun, info gotong royong, atau saran fasilitas di forum desa Arjawinangun.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPostModal(true)}
+                    className="mt-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
+                  >
+                    + Buat Postingan Pertama
+                  </button>
+                </div>
+              ) : (
+                posts.map((post) => (
                 <div
                   key={post.id}
                   className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-2.5"
@@ -302,7 +320,7 @@ export const BantuanKomunitasScreen: React.FC<BantuanKomunitasScreenProps> = ({
                     </div>
                   )}
                 </div>
-              ))}
+              )))}
             </div>
           </div>
         )}
