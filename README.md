@@ -4,7 +4,7 @@ Aplikasi Wong Arjawinangun adalah perangkat lunak yang dikembangkan untuk inform
 
 ## Hak Cipta
 
-© 2026 Wong Arjawinangun.  
+by Ombi & Didin Frangklin © 2026 Wong Arjawinangun.  
 Seluruh hak cipta dilindungi undang-undang.
 
 Dilarang memperbanyak, mendistribusikan, atau memodifikasi sebagian maupun seluruh isi aplikasi ini tanpa izin tertulis dari pemilik.
@@ -12,4 +12,3 @@ Dilarang memperbanyak, mendistribusikan, atau memodifikasi sebagian maupun selur
 ## Lisensi
 
 All rights reserved
-by Ombi & Didin Frangklin
