@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { AppRole, OrderRecord } from '../../types';
-import { MOCK_ORDERS } from '../../data/mockData';
+import { AppRole, OrderRecord, ScreenId, UserAccount, UserReview } from '../../types';
+import { MOCK_ORDERS, MOCK_USERS, MOCK_USER_REVIEWS } from '../../data/mockData';
 import {
   ArrowLeft,
   User,
@@ -15,26 +15,164 @@ import {
   CheckCircle2,
   ChevronRight,
   LogOut,
-  Edit3
+  Edit3,
+  ShieldAlert,
+  Shield,
+  Bike,
+  Store,
+  ExternalLink,
+  Lock,
+  Award,
+  Sparkles,
+  Camera,
+  X,
+  PlusCircle,
+  MessageSquare,
+  ThumbsUp
 } from 'lucide-react';
 
 interface ProfilScreenProps {
   userRole: AppRole;
+  userAccounts?: Record<string, UserAccount>;
+  onUpdateAccount?: (role: AppRole, data: Partial<UserAccount>) => void;
   onSwitchRole: (newRole: AppRole) => void;
+  onNavigate?: (screen: ScreenId) => void;
   onBack: () => void;
   isWireframe?: boolean;
 }
 
 export const ProfilScreen: React.FC<ProfilScreenProps> = ({
   userRole,
+  userAccounts,
+  onUpdateAccount,
   onSwitchRole,
+  onNavigate,
   onBack,
   isWireframe = false,
 }) => {
-  const [activeTab, setActiveTab] = useState<'pribadi' | 'riwayat' | 'favorit' | 'pengaturan' | 'rating'>('riwayat');
+  const [activeTab, setActiveTab] = useState<'pribadi' | 'riwayat' | 'favorit' | 'pengaturan' | 'rating'>('pribadi');
   const [language, setLanguage] = useState<'id' | 'crb'>('crb'); // crb: Cirebonan
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [selectedReceipt, setSelectedReceipt] = useState<OrderRecord | null>(null);
+
+  const currentUser = userAccounts?.[userRole] || MOCK_USERS[userRole] || MOCK_USERS.pelanggan;
+
+  // Edit Profile Modal States
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editName, setEditName] = useState(currentUser.name);
+  const [editPhone, setEditPhone] = useState(currentUser.emailOrPhone);
+  const [editLocation, setEditLocation] = useState(currentUser.location);
+  const [editRtRw, setEditRtRw] = useState(currentUser.rtRw || 'RT 03 / RW 02');
+  const [editNik, setEditNik] = useState(currentUser.nik || '3209141902950005');
+  const [editBio, setEditBio] = useState(currentUser.description || '');
+  const [editAvatar, setEditAvatar] = useState(currentUser.avatar);
+  const [saveSuccessNotice, setSaveSuccessNotice] = useState<string | null>(null);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+  // Review Submitting Modal States
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [targetReviewUser, setTargetReviewUser] = useState('Mang Duloh (Becak Onthel)');
+  const [newIntegrityScore, setNewIntegrityScore] = useState(5.0);
+  const [newServiceScore, setNewServiceScore] = useState(5.0);
+  const [newCommentText, setNewCommentText] = useState('');
+  const [reviewsList, setReviewsList] = useState<UserReview[]>(
+    MOCK_USER_REVIEWS[currentUser.id] || MOCK_USER_REVIEWS['usr-pelanggan'] || []
+  );
+
+  const avatarPresets = [
+    'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1567532939604-b6b5b0db2604?w=150&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80',
+  ];
+
+  const handleOpenEditModal = () => {
+    setEditName(currentUser.name);
+    setEditPhone(currentUser.emailOrPhone);
+    setEditLocation(currentUser.location);
+    setEditRtRw(currentUser.rtRw || 'RT 03 / RW 02');
+    setEditNik(currentUser.nik || '3209141902950005');
+    setEditBio(currentUser.description || '');
+    setEditAvatar(currentUser.avatar);
+    setShowEditModal(true);
+  };
+
+  const handleSaveProfile = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editName.trim()) return;
+
+    if (onUpdateAccount) {
+      onUpdateAccount(userRole, {
+        name: editName.trim(),
+        emailOrPhone: editPhone.trim(),
+        location: editLocation.trim(),
+        rtRw: editRtRw.trim(),
+        nik: editNik.trim(),
+        description: editBio.trim(),
+        avatar: editAvatar,
+      });
+    }
+
+    setShowEditModal(false);
+    setSaveSuccessNotice('Profil asli Anda berhasil disimpan dan tersinkronisasi ke seluruh layanan!');
+    setTimeout(() => setSaveSuccessNotice(null), 3500);
+  };
+
+  const handleAddReview = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCommentText.trim()) return;
+
+    const newRev: UserReview = {
+      id: `rev-${Date.now()}`,
+      reviewerName: currentUser.name,
+      reviewerRole: currentUser.roleTitle,
+      integrityScore: newIntegrityScore,
+      serviceScore: newServiceScore,
+      comment: newCommentText.trim(),
+      date: 'Baru saja',
+    };
+
+    setReviewsList([newRev, ...reviewsList]);
+    setNewCommentText('');
+    setShowReviewModal(false);
+    setSaveSuccessNotice('Penilaian berhasil dikirim dan ditambahkan ke reputasi warga!');
+    setTimeout(() => setSaveSuccessNotice(null), 3000);
+  };
+
+  const roleMeta: Record<AppRole, { title: string; screen: ScreenId; badgeBg: string; text: string }> = {
+    super_admin: {
+      title: 'Super Admin',
+      screen: 'super_admin_dashboard',
+      badgeBg: 'bg-purple-100 text-purple-800 border-purple-200',
+      text: 'Kelola Seluruh Sistem',
+    },
+    admin: {
+      title: 'Admin Operasional',
+      screen: 'admin_dashboard',
+      badgeBg: 'bg-blue-100 text-blue-800 border-blue-200',
+      text: 'Kelola Operasional Lapangan',
+    },
+    mitra: {
+      title: 'Mitra Warga',
+      screen: 'mitra_dashboard',
+      badgeBg: 'bg-amber-100 text-amber-800 border-amber-200',
+      text: 'Becak, Ojek & Tukang',
+    },
+    merchant: {
+      title: 'Merchant Kios',
+      screen: 'merchant_dashboard',
+      badgeBg: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+      text: 'Kios Pasar & Warung',
+    },
+    pelanggan: {
+      title: 'Pelanggan',
+      screen: 'dashboard',
+      badgeBg: 'bg-red-100 text-red-800 border-red-200',
+      text: 'Warga Pembeli & Pemesan',
+    },
+  };
 
   return (
     <div className={`min-h-full flex flex-col justify-between ${isWireframe ? 'bg-zinc-50' : 'bg-slate-50'}`}>
@@ -49,9 +187,15 @@ export const ProfilScreen: React.FC<ProfilScreenProps> = ({
             <span>Kembali</span>
           </button>
           <h2 className="text-sm font-bold truncate">Profil Pengguna</h2>
-          <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-medium">
-            Wong Arjawinangun
-          </span>
+          <button
+            type="button"
+            onClick={() => setShowLogoutModal(true)}
+            className="px-2.5 py-1 rounded-lg bg-white/20 hover:bg-white/30 text-white text-[10px] font-bold flex items-center gap-1 transition-colors"
+            title="Keluar dari Akun"
+          >
+            <LogOut size={12} />
+            <span>Keluar</span>
+          </button>
         </div>
       </div>
 
@@ -62,33 +206,171 @@ export const ProfilScreen: React.FC<ProfilScreenProps> = ({
           <div className="flex items-center gap-3">
             <div className="w-16 h-16 rounded-full overflow-hidden bg-slate-100 border-2 border-red-500 shrink-0">
               <img
-                src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80"
-                alt="Ageng Prasetyo"
+                src={currentUser.avatar}
+                alt={currentUser.name}
                 className="w-full h-full object-cover"
                 referrerPolicy="no-referrer"
               />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5">
-                <h3 className="text-sm font-extrabold text-slate-900 truncate">Ageng Prasetyo</h3>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <h3 className="text-sm font-extrabold text-slate-900 truncate">{currentUser.name}</h3>
                 <ShieldCheck size={16} className="text-emerald-600 shrink-0" />
               </div>
-              <p className="text-xs text-slate-500">0812-3456-7890 · Blok Makmur, RT 03 / RW 02</p>
+              <p className="text-xs text-slate-500">{currentUser.emailOrPhone} · {currentUser.location}</p>
 
-              {/* Role Badge and Switcher */}
-              <div className="mt-2 flex items-center gap-2">
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-800">
-                  {userRole === 'pelanggan' ? 'Peran: Pelanggan' : 'Peran: Mitra Warga'}
+              {/* Role Badge and Simple Inline 1-Tap Switcher */}
+              <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+                <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full border ${roleMeta[userRole]?.badgeBg || 'bg-red-100 text-red-800'}`}>
+                  {roleMeta[userRole]?.title || userRole}
                 </span>
-                <button
-                  type="button"
-                  onClick={() => onSwitchRole(userRole === 'pelanggan' ? 'mitra' : 'pelanggan')}
-                  className="text-[10px] font-semibold text-slate-600 hover:text-red-700 underline"
-                >
-                  Ganti ke {userRole === 'pelanggan' ? 'Mitra' : 'Pelanggan'}
-                </button>
+                <span className="text-[10px] text-slate-400">· {roleMeta[userRole]?.text}</span>
               </div>
             </div>
+          </div>
+
+          {/* Role Switching: Public Roles vs Dedicated Admin Portal */}
+          {userRole !== 'super_admin' && userRole !== 'admin' ? (
+            <div className="mt-3 pt-2.5 border-t border-slate-100 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  Ganti Akun Layanan Warga:
+                </span>
+                <span className="text-[9px] text-slate-400">3 Peran Publik</span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-1.5 text-center">
+                {[
+                  { role: 'pelanggan' as AppRole, icon: User, label: 'Pelanggan / Warga', activeBg: 'bg-red-600 text-white shadow-xs' },
+                  { role: 'mitra' as AppRole, icon: Bike, label: 'Mitra Armada', activeBg: 'bg-amber-600 text-white shadow-xs' },
+                  { role: 'merchant' as AppRole, icon: Store, label: 'Merchant Kios', activeBg: 'bg-emerald-600 text-white shadow-xs' },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  const isSelected = userRole === item.role;
+                  return (
+                    <button
+                      key={item.role}
+                      type="button"
+                      onClick={() => onSwitchRole(item.role)}
+                      className={`p-2 rounded-xl text-[10px] font-bold flex flex-col items-center justify-center transition-all ${
+                        isSelected
+                          ? item.activeBg
+                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                      }`}
+                    >
+                      <Icon size={15} className="mb-0.5 shrink-0" />
+                      <span className="truncate w-full leading-tight">{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Dedicated Admin Portal Access Link */}
+              {onNavigate && (
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => onNavigate('admin_portal_login')}
+                    className="w-full p-2 rounded-xl border border-dashed border-slate-300 hover:border-purple-300 bg-slate-50 hover:bg-purple-50/50 text-slate-600 hover:text-purple-900 text-[10px] font-bold flex items-center justify-between transition-colors"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <Lock size={12} className="text-amber-500" />
+                      <span>Portal Khusus Petugas Balai Desa (Admin & Kuwu)</span>
+                    </div>
+                    <ChevronRight size={13} className="text-slate-400" />
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* Administrator Internal View */
+            <div className="mt-3 pt-2.5 border-t border-purple-100 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-purple-900 uppercase tracking-wider">
+                  Hak Akses Petugas Balai Desa:
+                </span>
+                <span className="text-[9px] font-mono bg-purple-100 text-purple-800 px-1.5 py-0.2 rounded font-bold">
+                  Internal
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-1.5 text-center">
+                <button
+                  type="button"
+                  onClick={() => onSwitchRole('super_admin')}
+                  className={`p-2 rounded-xl text-[10px] font-bold flex items-center justify-center gap-1.5 transition-all ${
+                    userRole === 'super_admin'
+                      ? 'bg-purple-700 text-white shadow-xs'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                  }`}
+                >
+                  <ShieldAlert size={14} />
+                  <span>Super Admin (Kuwu)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onSwitchRole('admin')}
+                  className={`p-2 rounded-xl text-[10px] font-bold flex items-center justify-center gap-1.5 transition-all ${
+                    userRole === 'admin'
+                      ? 'bg-blue-700 text-white shadow-xs'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                  }`}
+                >
+                  <Shield size={14} />
+                  <span>Admin Operasional</span>
+                </button>
+              </div>
+
+              <div className="pt-1 flex items-center justify-between text-[10px]">
+                <button
+                  type="button"
+                  onClick={() => onSwitchRole('pelanggan')}
+                  className="text-slate-500 hover:text-red-700 font-semibold underline"
+                >
+                  ← Beralih ke Akun Warga (Pelanggan)
+                </button>
+                {onNavigate && (
+                  <button
+                    type="button"
+                    onClick={() => onNavigate('admin_portal_login')}
+                    className="text-purple-700 font-bold hover:underline"
+                  >
+                    Halaman Portal Petugas →
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Jump to Role Dashboard shortcut (if not on customer dashboard) */}
+          {userRole !== 'pelanggan' && onNavigate && (
+            <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between bg-slate-50 p-2.5 rounded-xl">
+              <div className="text-[11px]">
+                <span className="font-bold text-slate-800 block">Dashboard Peran Khusus</span>
+                <span className="text-[10px] text-slate-500">{roleMeta[userRole]?.text}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => onNavigate(roleMeta[userRole].screen)}
+                className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-[10px] rounded-lg flex items-center gap-1 transition-colors"
+              >
+                <span>Buka Dashboard</span>
+                <ExternalLink size={11} />
+              </button>
+            </div>
+          )}
+
+          {/* Tombol Keluar Akun Cepat */}
+          <div className="mt-3 pt-2.5 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => setShowLogoutModal(true)}
+              className="w-full py-2.5 px-3 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 font-bold text-xs flex items-center justify-center gap-2 border border-red-200 transition-colors shadow-2xs"
+            >
+              <LogOut size={14} />
+              <span>Keluar dari Akun ({currentUser.name})</span>
+            </button>
           </div>
         </div>
 
@@ -286,6 +568,22 @@ export const ProfilScreen: React.FC<ProfilScreenProps> = ({
                     Aktif
                   </span>
                 </div>
+
+                {/* Sesi & Logout */}
+                <div className="pt-2">
+                  <span className="font-bold text-slate-800 block mb-1.5">Sesi & Keamanan</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowLogoutModal(true)}
+                    className="w-full py-2.5 px-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-colors"
+                  >
+                    <LogOut size={15} />
+                    <span>Keluar Akun & Ganti Pengguna</span>
+                  </button>
+                  <p className="text-[10px] text-slate-400 text-center mt-1">
+                    Keluar untuk masuk kembali dengan peran atau nomor lain
+                  </p>
+                </div>
               </div>
             )}
 
@@ -370,6 +668,47 @@ export const ProfilScreen: React.FC<ProfilScreenProps> = ({
             >
               Tutup Struk
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Logout Confirmation Modal */}
+      {showLogoutModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-5 max-w-xs w-full text-left shadow-2xl border border-slate-100 animate-in zoom-in-95">
+            <div className="w-12 h-12 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-3">
+              <LogOut size={24} />
+            </div>
+            <h3 className="font-black text-sm text-slate-900 text-center">
+              Keluar dari Akun?
+            </h3>
+            <p className="text-xs text-slate-500 text-center mt-1.5 leading-relaxed">
+              Anda akan keluar dari akun <strong className="text-slate-800">{currentUser.name}</strong> ({roleMeta[userRole]?.title}) dan diarahkan ke layar pemilihan akun atau portal balai desa.
+            </p>
+            <div className="grid grid-cols-2 gap-2 mt-4">
+              <button
+                type="button"
+                onClick={() => setShowLogoutModal(false)}
+                className="py-2.5 px-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowLogoutModal(false);
+                  if (onNavigate) {
+                    onNavigate('welcome');
+                  } else {
+                    onBack();
+                  }
+                }}
+                className="py-2.5 px-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition-colors shadow-xs flex items-center justify-center gap-1.5"
+              >
+                <LogOut size={13} />
+                <span>Ya, Keluar</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ForumPost } from '../../types';
 import { FAQS, FORUM_POSTS, VILLAGE_CONTACTS } from '../../data/mockData';
+import { api } from '../../services/api';
 import {
   ArrowLeft,
   HelpCircle,
@@ -31,6 +32,13 @@ export const BantuanKomunitasScreen: React.FC<BantuanKomunitasScreenProps> = ({
   const [expandedFaq, setExpandedFaq] = useState<number | null>(0);
   const [posts, setPosts] = useState<ForumPost[]>(FORUM_POSTS);
 
+  // Load backend forum posts
+  useEffect(() => {
+    api.getForumPosts().then((data) => {
+      if (data && data.length > 0) setPosts(data);
+    }).catch(() => {});
+  }, []);
+
   // New post modal states
   const [showNewPostModal, setShowNewPostModal] = useState(false);
   const [newPostContent, setNewPostContent] = useState('');
@@ -58,10 +66,19 @@ export const BantuanKomunitasScreen: React.FC<BantuanKomunitasScreenProps> = ({
         return p;
       })
     );
+    api.likeForumPost(postId).catch(() => {});
   };
 
-  const handleCreatePost = () => {
+  const handleCreatePost = async () => {
     if (!newPostContent.trim()) return;
+
+    const newPostData = {
+      author: 'Ageng Prasetyo',
+      block: 'Blok Makmur',
+      role: 'Warga',
+      category: newPostCategory,
+      content: newPostContent,
+    };
 
     const newPost: ForumPost = {
       id: `post-${Date.now()}`,
@@ -80,10 +97,21 @@ export const BantuanKomunitasScreen: React.FC<BantuanKomunitasScreenProps> = ({
     setPosts([newPost, ...posts]);
     setNewPostContent('');
     setShowNewPostModal(false);
+
+    try {
+      await api.createForumPost(newPostData);
+    } catch (e) {
+      console.warn('Backend sync post:', e);
+    }
   };
 
-  const handleAddComment = (postId: string) => {
+  const handleAddComment = async (postId: string) => {
     if (!commentInput.trim()) return;
+
+    const commentData = {
+      author: 'Ageng Prasetyo',
+      text: commentInput,
+    };
 
     setPosts((prev) =>
       prev.map((p) => {
@@ -105,8 +133,15 @@ export const BantuanKomunitasScreen: React.FC<BantuanKomunitasScreenProps> = ({
       })
     );
 
+    const textToSubmit = commentInput;
     setCommentInput('');
     setCommentingPostId(null);
+
+    try {
+      await api.addForumComment(postId, { author: 'Ageng Prasetyo', text: textToSubmit });
+    } catch (e) {
+      console.warn('Backend sync comment:', e);
+    }
   };
 
   return (

@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LocationItem, DriverVehicle, DriverInfo, ChatMessage } from '../../types';
 import { MOCK_LOCATIONS, VEHICLE_OPTIONS, MOCK_DRIVERS, APP_IMAGES } from '../../data/mockData';
+import { api } from '../../services/api';
+import { requestDeviceLocation } from '../../services/locationService';
 import {
   ArrowLeft,
   MapPin,
@@ -11,7 +13,8 @@ import {
   Clock,
   Send,
   Sparkles,
-  RotateCcw
+  RotateCcw,
+  RefreshCw
 } from 'lucide-react';
 
 interface OjekBecakFlowProps {
@@ -33,6 +36,27 @@ export const OjekBecakFlow: React.FC<OjekBecakFlowProps> = ({
   const [selectedVehicle, setSelectedVehicle] = useState<DriverVehicle>(VEHICLE_OPTIONS[0]); // Becak Onthel
   const [paymentMethod, setPaymentMethod] = useState<'tunai' | 'qris'>('tunai');
   const [activeDriver, setActiveDriver] = useState<DriverInfo>(MOCK_DRIVERS.becak_onthel);
+  const [gpsLoading, setGpsLoading] = useState(false);
+  const [availableVehicles, setAvailableVehicles] = useState<DriverVehicle[]>(VEHICLE_OPTIONS);
+
+  useEffect(() => {
+    api.getDrivers().then((res) => {
+      if (res && res.vehicleOptions && res.vehicleOptions.length > 0) {
+        setAvailableVehicles(res.vehicleOptions);
+      }
+    }).catch(() => {});
+  }, []);
+
+  const handlePickupGps = async () => {
+    setGpsLoading(true);
+    try {
+      const result = await requestDeviceLocation();
+      setPickup(result.matchedLocation);
+      setGpsLoading(false);
+    } catch (e) {
+      setGpsLoading(false);
+    }
+  };
 
   // Live chat messages
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
@@ -173,7 +197,27 @@ export const OjekBecakFlow: React.FC<OjekBecakFlowProps> = ({
                   <MapPin size={14} />
                 </div>
                 <div className="flex-1 overflow-hidden">
-                  <span className="text-[10px] text-slate-400 font-semibold block">Titik Jemput:</span>
+                  <div className="flex items-center justify-between pb-0.5">
+                    <span className="text-[10px] text-slate-400 font-semibold block">Titik Jemput:</span>
+                    <button
+                      type="button"
+                      onClick={handlePickupGps}
+                      disabled={gpsLoading}
+                      className="text-[9px] font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-100/70 hover:bg-emerald-100 px-1.5 py-0.2 rounded flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      {gpsLoading ? (
+                        <>
+                          <RefreshCw size={9} className="animate-spin" />
+                          <span>Mencari GPS...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Navigation size={9} />
+                          <span>Gunakan GPS Aktual</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                   <select
                     value={pickup.id}
                     onChange={(e) => {
@@ -182,6 +226,9 @@ export const OjekBecakFlow: React.FC<OjekBecakFlowProps> = ({
                     }}
                     className="w-full text-xs font-bold text-slate-800 bg-transparent focus:outline-none"
                   >
+                    {pickup.id === 'loc-gps-aktual' && (
+                      <option value="loc-gps-aktual">📍 {pickup.name}</option>
+                    )}
                     {MOCK_LOCATIONS.map((l) => (
                       <option key={l.id} value={l.id}>
                         {l.name} ({l.detail})

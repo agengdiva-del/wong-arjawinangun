@@ -11,7 +11,8 @@ import {
   Bike,
   User,
   ShieldCheck,
-  Phone
+  Phone,
+  LogOut
 } from 'lucide-react';
 
 interface MitraDashboardScreenProps {
@@ -24,6 +25,7 @@ interface MitraDashboardScreenProps {
 export const MitraDashboardScreen: React.FC<MitraDashboardScreenProps> = ({
   onBack,
   onSwitchRole,
+  onNavigate,
   isWireframe = false,
 }) => {
   const [isOnline, setIsOnline] = useState(true);
@@ -57,11 +59,14 @@ export const MitraDashboardScreen: React.FC<MitraDashboardScreenProps> = ({
             <h2 className="text-sm font-bold truncate">Dashboard Mitra Warga</h2>
             <span className="text-[10px] text-amber-100">Mang Duloh · Becak No. 14</span>
           </div>
+
           <button
-            onClick={() => onSwitchRole('pelanggan')}
-            className="text-[10px] bg-white/20 hover:bg-white/30 px-2 py-1 rounded-lg font-bold"
+            onClick={() => onNavigate('welcome')}
+            className="text-[10px] bg-amber-900/80 hover:bg-amber-900 text-white font-bold px-2.5 py-1 rounded-lg border border-amber-400/40 cursor-pointer flex items-center gap-1 transition-colors"
+            title="Keluar dari Akun Mitra"
           >
-            Pelanggan
+            <LogOut size={11} />
+            <span>Keluar Akun</span>
           </button>
         </div>
       </div>
@@ -190,14 +195,37 @@ export const MitraDashboardScreen: React.FC<MitraDashboardScreenProps> = ({
             <span className="text-[9px] text-slate-400 mt-1 block">Dari 6 tarikan & titipan</span>
           </div>
 
-          <div className="bg-white p-3 rounded-2xl border border-slate-200 text-left">
-            <span className="text-[10px] text-slate-500 font-semibold block">Rating Pelayanan</span>
-            <div className="flex items-center gap-1 mt-0.5">
-              <span className="text-amber-500 text-base font-bold">★ 4.9</span>
-              <span className="text-[11px] text-slate-500">/ 5.0</span>
-            </div>
-            <span className="text-[9px] text-slate-400 mt-1 block">Terakreditasi Paguyuban Becak</span>
+        {/* Penilaian Rating (Integritas & Layanan) Warga */}
+        <div className="bg-gradient-to-br from-amber-50 to-orange-50 p-3 rounded-2xl border border-amber-200 text-left">
+          <div className="flex items-center justify-between pb-1.5 border-b border-amber-200/60">
+            <span className="text-[10px] font-extrabold text-amber-900 uppercase tracking-wider">
+              ⭐ Reputasi & Penilaian Mitra
+            </span>
+            <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded-full">
+              Terverifikasi Paguyuban
+            </span>
           </div>
+
+          <div className="grid grid-cols-2 gap-2 mt-2">
+            <div className="bg-white/90 p-2 rounded-xl border border-amber-100">
+              <span className="text-[9px] text-slate-500 font-bold block">Rating Integritas</span>
+              <div className="flex items-center gap-1 mt-0.5">
+                <span className="text-emerald-600 text-xs font-black">★ 4.95</span>
+                <span className="text-[9px] text-slate-400">/ 5.0</span>
+              </div>
+              <span className="text-[8px] text-emerald-700 block mt-0.5">Amanah & Jujur</span>
+            </div>
+
+            <div className="bg-white/90 p-2 rounded-xl border border-amber-100">
+              <span className="text-[9px] text-slate-500 font-bold block">Rating Layanan</span>
+              <div className="flex items-center gap-1 mt-0.5">
+                <span className="text-amber-500 text-xs font-black">★ 4.90</span>
+                <span className="text-[9px] text-slate-400">/ 5.0</span>
+              </div>
+              <span className="text-[8px] text-amber-700 block mt-0.5">Cepat & Ramah</span>
+            </div>
+          </div>
+        </div>
         </div>
 
         {/* Paguyuban Info */}

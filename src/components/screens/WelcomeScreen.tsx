@@ -1,284 +1,764 @@
-import React, { useState } from 'react';
-import { AppRole, LocationItem } from '../../types';
-import { MOCK_LOCATIONS } from '../../data/mockData';
-import { MapPin, User, Briefcase, CheckCircle2, ChevronRight, ShieldCheck } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { AppRole, LocationItem, UserAccount } from '../../types';
+import { MOCK_LOCATIONS, MOCK_USERS } from '../../data/mockData';
+import { api } from '../../services/api';
+import { requestDeviceLocation, DeviceLocationResult } from '../../services/locationService';
+import {
+  MapPin,
+  ChevronRight,
+  ShieldCheck,
+  Bike,
+  Store,
+  User,
+  ArrowRight,
+  Lock,
+  Building2,
+  Phone,
+  MessageCircle,
+  Sparkles,
+  CheckCircle2,
+  RefreshCw,
+  Navigation,
+  AlertCircle,
+  KeyRound,
+  X,
+  Copy,
+  Clock,
+  ArrowLeft,
+  LogIn,
+} from 'lucide-react';
 
 interface WelcomeScreenProps {
-  onContinue: (role: AppRole, location: LocationItem) => void;
+  onContinue: (role: AppRole, location: LocationItem, user?: UserAccount) => void;
+  onOpenAdminPortal?: () => void;
   currentRole: AppRole;
   currentLocation: LocationItem;
+  userAccounts?: Record<string, any>;
   isWireframe?: boolean;
 }
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   onContinue,
+  onOpenAdminPortal,
   currentRole: initialRole,
   currentLocation: initialLocation,
+  userAccounts,
   isWireframe = false,
 }) => {
-  const [selectedRole, setSelectedRole] = useState<AppRole>(initialRole);
+  const accountsData = userAccounts || MOCK_USERS;
+
+  // Selected Location State & Device Location State
   const [selectedLocation, setSelectedLocation] = useState<LocationItem>(initialLocation);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
-  const [authModal, setAuthModal] = useState<'login' | 'register' | null>(null);
-  const [nameInput, setNameInput] = useState('Ageng Prasetyo');
-  const [phoneInput, setPhoneInput] = useState('0812-3456-7890');
+  const [gpsLoading, setGpsLoading] = useState(false);
+  const [gpsResult, setGpsResult] = useState<DeviceLocationResult | null>(() => {
+    try {
+      const saved = localStorage.getItem('wong_arjawinangun_gps_location');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
+  });
+  const [gpsError, setGpsError] = useState<string | null>(null);
 
-  const handleStart = () => {
-    onContinue(selectedRole, selectedLocation);
+  // Authentication Mode: 'masuk' | 'daftar'
+  const [authMode, setAuthMode] = useState<'masuk' | 'daftar'>('masuk');
+
+  // Direct Login Form States (Masuk Langsung Tanpa OTP WhatsApp)
+  const [loginPhone, setLoginPhone] = useState('081234567890');
+  const [loginRole, setLoginRole] = useState<AppRole>(initialRole || 'pelanggan');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
+
+  // WhatsApp Auth Form States (Khusus Pendaftaran Baru)
+  const [whatsappPhone, setWhatsappPhone] = useState('081234567890');
+  const [registerName, setRegisterName] = useState('');
+  const [registerRole, setRegisterRole] = useState<AppRole>('pelanggan');
+  const [registerRtRw, setRegisterRtRw] = useState('RT 03 / RW 02 Blok Makmur');
+
+  // OTP Verification Modal States
+  const [showOtpModal, setShowOtpModal] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [receivedOtpPreview, setReceivedOtpPreview] = useState<string | null>(null);
+  const [otpCountdown, setOtpCountdown] = useState(60);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [otpSuccessNotice, setOtpSuccessNotice] = useState<string | null>(null);
+
+  // Public Community Demo Accounts
+  const publicAccounts = [
+    {
+      role: 'pelanggan' as AppRole,
+      title: 'Pelanggan',
+      badge: '👤 Warga & Pembeli',
+      user: accountsData.pelanggan || MOCK_USERS.pelanggan,
+      phone: '081234567890',
+      tagline: `${accountsData.pelanggan?.location || 'Blok Makmur'} · Warga Terverifikasi`,
+      accent: 'border-red-500 bg-red-50/70 text-red-950',
+      badgeColor: 'bg-red-600 text-white',
+      avatarBorder: 'border-red-500',
+    },
+    {
+      role: 'mitra' as AppRole,
+      title: 'Mitra',
+      badge: '🚲 Driver & Jasa',
+      user: accountsData.mitra || MOCK_USERS.mitra,
+      phone: '081234567891',
+      tagline: 'Mitra Becak Onthel No. 14 Blok Makmur',
+      accent: 'border-amber-500 bg-amber-50/70 text-amber-950',
+      badgeColor: 'bg-amber-600 text-white',
+      avatarBorder: 'border-amber-500',
+    },
+    {
+      role: 'merchant' as AppRole,
+      title: 'Merchant',
+      badge: '🏪 Kios Pasar',
+      user: accountsData.merchant || MOCK_USERS.merchant,
+      phone: '087722334455',
+      tagline: 'Kios Sayur & Bumbu Pasar Jungjang',
+      accent: 'border-emerald-500 bg-emerald-50/70 text-emerald-950',
+      badgeColor: 'bg-emerald-600 text-white',
+      avatarBorder: 'border-emerald-500',
+    },
+  ];
+
+  // OTP Timer countdown
+  useEffect(() => {
+    let timer: any;
+    if (showOtpModal && otpCountdown > 0) {
+      timer = setInterval(() => {
+        setOtpCountdown((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [showOtpModal, otpCountdown]);
+
+  // Request actual GPS location
+  const handleRequestDeviceGps = async () => {
+    setGpsLoading(true);
+    setGpsError(null);
+    try {
+      const result = await requestDeviceLocation();
+      setGpsResult(result);
+      setSelectedLocation(result.matchedLocation);
+      setGpsLoading(false);
+    } catch (err: any) {
+      setGpsLoading(false);
+      setGpsError(err.message || 'Izin lokasi tidak dapat diakses');
+    }
+  };
+
+  // Trigger Send WhatsApp OTP
+  const handleSendOtp = async (phoneToUse?: string, targetRole?: AppRole) => {
+    const targetPhone = phoneToUse || whatsappPhone;
+    if (!targetPhone || targetPhone.length < 9) {
+      alert('Masukkan nomor WhatsApp yang valid (contoh: 081234567890)');
+      return;
+    }
+
+    setIsVerifyingOtp(true);
+    setOtpError(null);
+
+    try {
+      const purpose = authMode === 'daftar' ? 'register' : 'login';
+      const resp = await api.sendWhatsAppOtp(targetPhone, purpose, targetRole || registerRole);
+      setIsVerifyingOtp(false);
+      if (resp.success) {
+        setReceivedOtpPreview(resp.otpPreview || '829104');
+        setOtpCode('');
+        setOtpCountdown(60);
+        setShowOtpModal(true);
+      } else {
+        alert(resp.message || 'Gagal mengirim OTP WhatsApp');
+      }
+    } catch (e: any) {
+      setIsVerifyingOtp(false);
+      setReceivedOtpPreview('829104');
+      setOtpCode('');
+      setOtpCountdown(60);
+      setShowOtpModal(true);
+    }
+  };
+
+  // Submit and verify OTP
+  const handleVerifyOtp = async () => {
+    if (!otpCode || otpCode.trim().length < 4) {
+      setOtpError('Masukkan 6-digit kode verifikasi yang dikirimkan.');
+      return;
+    }
+
+    setIsVerifyingOtp(true);
+    setOtpError(null);
+
+    try {
+      const roleToUse = authMode === 'daftar' ? registerRole : (initialRole || 'pelanggan');
+      const newUserData = authMode === 'daftar'
+        ? {
+            name: registerName || `Warga (${whatsappPhone.slice(-4)})`,
+            location: selectedLocation.name,
+            rtRw: registerRtRw,
+          }
+        : undefined;
+
+      const res = await api.verifyWhatsAppOtp(whatsappPhone, otpCode.trim(), roleToUse, newUserData);
+      setIsVerifyingOtp(false);
+
+      if (res.success && res.user) {
+        setOtpSuccessNotice(`Verifikasi Berhasil! Selamat datang, ${res.user.name}`);
+        setTimeout(() => {
+          setShowOtpModal(false);
+          onContinue(res.user.role, selectedLocation, res.user);
+        }, 800);
+      } else {
+        setOtpError(res.message || 'Kode verifikasi tidak sesuai.');
+      }
+    } catch (err: any) {
+      setIsVerifyingOtp(false);
+      // Fallback verification for demo
+      if (otpCode === '123456' || otpCode === receivedOtpPreview) {
+        setOtpSuccessNotice('Verifikasi Berhasil!');
+        setTimeout(() => {
+          setShowOtpModal(false);
+          const user = accountsData[registerRole] || MOCK_USERS[registerRole] || MOCK_USERS.pelanggan;
+          onContinue(user.role, selectedLocation, user);
+        }, 800);
+      } else {
+        setOtpError('Kode OTP tidak sesuai. Silakan gunakan tombol isi otomatis di atas.');
+      }
+    }
+  };
+
+  // Direct Login (Tanpa OTP WhatsApp untuk Tab Masuk)
+  const handleDirectLogin = async () => {
+    setIsLoggingIn(true);
+    setLoginError(null);
+
+    try {
+      const res = await api.directLogin(loginPhone, loginRole);
+      setIsLoggingIn(false);
+      const user = res?.user || accountsData[loginRole] || MOCK_USERS[loginRole] || MOCK_USERS.pelanggan;
+      onContinue(user.role || loginRole, selectedLocation, user);
+    } catch (err: any) {
+      setIsLoggingIn(false);
+      const user = accountsData[loginRole] || MOCK_USERS[loginRole] || MOCK_USERS.pelanggan;
+      onContinue(loginRole, selectedLocation, user);
+    }
+  };
+
+  // Quick select akun demo warga (Langsung Masuk 1-Klik Tanpa OTP)
+  const handleQuickDemoSelect = (role: AppRole, phone: string) => {
+    setLoginRole(role);
+    setLoginPhone(phone);
+    const user = accountsData[role] || MOCK_USERS[role] || MOCK_USERS.pelanggan;
+    onContinue(role, selectedLocation, user);
   };
 
   return (
-    <div className={`min-h-full flex flex-col justify-between p-5 ${
-      isWireframe ? 'bg-zinc-50 text-zinc-900' : 'bg-gradient-to-b from-amber-50 via-white to-red-50 text-slate-800'
+    <div className={`min-h-full flex flex-col justify-between p-4 ${
+      isWireframe ? 'bg-zinc-50 text-zinc-900' : 'bg-gradient-to-b from-amber-50/80 via-white to-red-50/70 text-slate-800'
     }`}>
-      {/* Top Branding Section */}
-      <div className="pt-6 text-center">
-        {/* App Logo */}
-        <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl mb-4 shadow-md bg-gradient-to-tr from-red-700 to-rose-600 text-white">
-          <div className="relative flex items-center justify-center">
-            <span className="text-3xl font-black tracking-wider">WA</span>
-            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-amber-400 rounded-full border-2 border-white flex items-center justify-center">
-              <span className="text-[9px] font-bold text-red-900">✓</span>
-            </div>
-          </div>
+      {/* Top Header Branding */}
+      <div className="pt-2 pb-1 text-center">
+        <div className="inline-flex items-center justify-center w-13 h-13 rounded-2xl mb-1.5 shadow-md bg-gradient-to-tr from-red-700 to-rose-600 text-white">
+          <span className="text-xl font-black tracking-wider">WA</span>
         </div>
-
-        <h1 className="text-2xl font-black tracking-tight text-red-700">
+        <h1 className="text-xl font-black tracking-tight text-red-700">
           Wong Arjawinangun
         </h1>
-        <p className="text-xs font-medium text-slate-500 mt-1">
-          Aplikasi Layanan & Komunitas Warga Arjawinangun
+        <p className="text-[11px] text-slate-500">
+          Layanan Digital Warga & Pasar Desa Arjawinangun
         </p>
-        <div className="inline-flex items-center gap-1.5 mt-2 px-3 py-1 bg-red-100/70 text-red-800 rounded-full text-[11px] font-semibold">
-          <span>Bersama Lebih Nyaman</span>
-          <span className="text-xs">🤝</span>
-        </div>
       </div>
 
-      {/* Center Action Box: Role Selector & Action Buttons */}
-      <div className="my-6 space-y-5">
-        {/* Role Selector */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
-          <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2.5">
-            Pilih Peran Anda
-          </label>
-          <div className="grid grid-cols-2 gap-2.5">
-            <button
-              type="button"
-              onClick={() => setSelectedRole('pelanggan')}
-              className={`p-3 rounded-xl border text-left transition-all relative flex flex-col items-start ${
-                selectedRole === 'pelanggan'
-                  ? 'border-red-600 bg-red-50/70 text-red-900 ring-2 ring-red-500/20'
-                  : 'border-slate-200 hover:border-slate-300 text-slate-700'
-              }`}
-            >
-              <div className="flex items-center justify-between w-full mb-1">
-                <div className={`p-1.5 rounded-lg ${selectedRole === 'pelanggan' ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
-                  <User size={16} />
-                </div>
-                {selectedRole === 'pelanggan' && (
-                  <CheckCircle2 size={16} className="text-red-600" />
-                )}
-              </div>
-              <span className="font-bold text-xs mt-1">Pelanggan</span>
-              <span className="text-[10px] text-slate-500 line-clamp-1">Warga & Pembeli</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setSelectedRole('mitra')}
-              className={`p-3 rounded-xl border text-left transition-all relative flex flex-col items-start ${
-                selectedRole === 'mitra'
-                  ? 'border-red-600 bg-red-50/70 text-red-900 ring-2 ring-red-500/20'
-                  : 'border-slate-200 hover:border-slate-300 text-slate-700'
-              }`}
-            >
-              <div className="flex items-center justify-between w-full mb-1">
-                <div className={`p-1.5 rounded-lg ${selectedRole === 'mitra' ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
-                  <Briefcase size={16} />
-                </div>
-                {selectedRole === 'mitra' && (
-                  <CheckCircle2 size={16} className="text-red-600" />
-                )}
-              </div>
-              <span className="font-bold text-xs mt-1">Mitra Warga</span>
-              <span className="text-[10px] text-slate-500 line-clamp-1">Becak / Ojek / Toko</span>
-            </button>
+      {/* 1. LOKASI PERANGKAT & GPS AKTUAL */}
+      <div className="bg-white rounded-2xl p-3 border border-slate-200/90 shadow-2xs text-left mb-2.5">
+        <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
+          <div className="flex items-center gap-1.5">
+            <MapPin size={14} className="text-red-600" />
+            <span className="text-xs font-bold text-slate-800">
+              Lokasi Titik Jemput / Pengantaran
+            </span>
           </div>
-
-          <div className="mt-2.5 flex items-center gap-1.5 text-[11px] text-slate-500">
-            <ShieldCheck size={13} className="text-emerald-600 shrink-0" />
-            <span>Terhubung langsung dengan paguyuban & RT/RW setempat</span>
-          </div>
+          <button
+            type="button"
+            onClick={handleRequestDeviceGps}
+            disabled={gpsLoading}
+            className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center gap-1 transition-colors cursor-pointer"
+            title="Deteksi Lokasi GPS Aktual"
+          >
+            {gpsLoading ? (
+              <>
+                <RefreshCw size={11} className="animate-spin text-emerald-600" />
+                <span>Mendeteksi...</span>
+              </>
+            ) : (
+              <>
+                <Navigation size={11} className="text-emerald-600" />
+                <span>Gunakan GPS Aktual</span>
+              </>
+            )}
+          </button>
         </div>
 
-        {/* Big Action Buttons: Masuk & Daftar */}
-        <div className="space-y-2.5">
-          <button
-            type="button"
-            onClick={() => setAuthModal('login')}
-            className="w-full py-3.5 px-4 rounded-xl font-bold text-sm text-white bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-700 hover:to-rose-800 shadow-md shadow-red-600/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-          >
-            <span>Masuk ke Aplikasi</span>
-            <ChevronRight size={16} />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setAuthModal('register')}
-            className="w-full py-3.5 px-4 rounded-xl font-bold text-sm text-red-700 bg-white border border-red-300 hover:bg-red-50/50 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-xs"
-          >
-            <span>Daftar Akun Baru</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleStart}
-            className="w-full py-2 text-center text-xs font-semibold text-slate-500 hover:text-red-700 underline underline-offset-4 decoration-slate-300 transition-colors"
-          >
-            Jelajahi Langsung Sebagai Tamu (Demo Mode) →
-          </button>
-        </div>
-      </div>
-
-      {/* Auto Location Display at the bottom */}
-      <div className="pt-2 pb-1 border-t border-slate-200/60">
-        <div className="flex items-center justify-between bg-white/90 backdrop-blur-xs p-3 rounded-xl border border-slate-200/80 shadow-xs">
-          <div className="flex items-center gap-2.5 overflow-hidden">
-            <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center text-red-600 shrink-0">
-              <MapPin size={16} />
-            </div>
-            <div className="truncate text-left">
-              <span className="block text-[10px] text-slate-500 font-medium">Lokasi Otomatis Terdeteksi:</span>
-              <span className="block text-xs font-bold text-slate-800 truncate">
-                {selectedLocation.name}, {selectedLocation.detail}
+        <div className="pt-2 flex items-center justify-between">
+          <div className="min-w-0 pr-2">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-black text-slate-900 truncate">
+                {selectedLocation.name}
               </span>
+              {gpsResult && (
+                <span className="text-[9px] bg-emerald-600 text-white font-extrabold px-1.5 py-0.2 rounded-full shrink-0">
+                  GPS Aktif (±{gpsResult.accuracy}m)
+                </span>
+              )}
             </div>
+            <p className="text-[10px] text-slate-500 truncate mt-0.5">
+              {selectedLocation.detail}
+            </p>
           </div>
+
           <button
             type="button"
-            onClick={() => setShowLocationPicker(true)}
-            className="text-[11px] font-bold text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-lg shrink-0 transition-colors"
+            onClick={() => setShowLocationPicker(!showLocationPicker)}
+            className="text-[10px] text-red-700 font-bold hover:underline shrink-0 px-1 py-0.5"
           >
-            Ganti
+            {showLocationPicker ? 'Tutup' : 'Ganti Titik'}
           </button>
+        </div>
+
+        {gpsError && (
+          <div className="mt-2 p-1.5 bg-amber-50 border border-amber-200 rounded-lg text-[10px] text-amber-800 flex items-center gap-1.5">
+            <AlertCircle size={12} className="text-amber-600 shrink-0" />
+            <span>{gpsError}. Silakan pilih titik blok secara manual di bawah.</span>
+          </div>
+        )}
+
+        {/* Location Dropdown selector */}
+        {showLocationPicker && (
+          <div className="mt-2 pt-2 border-t border-slate-100 space-y-1 max-h-40 overflow-y-auto">
+            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+              Pilih Dusun / Blok di Arjawinangun:
+            </span>
+            {MOCK_LOCATIONS.map((loc) => (
+              <button
+                key={loc.id}
+                type="button"
+                onClick={() => {
+                  setSelectedLocation(loc);
+                  setShowLocationPicker(false);
+                }}
+                className={`w-full text-left p-1.5 rounded-lg text-[11px] flex items-center justify-between transition-colors ${
+                  selectedLocation.id === loc.id
+                    ? 'bg-red-50 text-red-800 font-bold'
+                    : 'hover:bg-slate-50 text-slate-700'
+                }`}
+              >
+                <div>
+                  <span className="block">{loc.name}</span>
+                  <span className="text-[9px] text-slate-400">{loc.detail}</span>
+                </div>
+                <span className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded font-medium">
+                  {loc.tag}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* 2. AKSES PENGGUNA (MASUK LANGSUNG & DAFTAR WHATSAPP) */}
+      <div className="bg-white rounded-2xl p-3.5 border border-slate-200/90 shadow-2xs text-left mb-2.5">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-3">
+          <div className="flex items-center gap-1.5">
+            <div className={`w-6 h-6 rounded-lg ${authMode === 'masuk' ? 'bg-red-600 text-white' : 'bg-emerald-500 text-white'} flex items-center justify-center transition-colors`}>
+              {authMode === 'masuk' ? <LogIn size={15} /> : <MessageCircle size={15} />}
+            </div>
+            <div>
+              <h3 className="text-xs font-black text-slate-900">
+                {authMode === 'masuk' ? 'Masuk ke Akun Warga' : 'Pendaftaran WhatsApp'}
+              </h3>
+              <p className="text-[9px] text-slate-500">
+                {authMode === 'masuk' ? 'Masuk langsung tanpa perlu kode OTP' : 'Verifikasi nomor via kode OTP WhatsApp'}
+              </p>
+            </div>
+          </div>
+
+          {/* Toggle Tab Masuk / Daftar */}
+          <div className="flex bg-slate-100 p-0.5 rounded-lg text-[10px] font-bold">
+            <button
+              type="button"
+              onClick={() => {
+                setAuthMode('masuk');
+                setLoginError(null);
+              }}
+              className={`px-2.5 py-1 rounded-md transition-colors ${
+                authMode === 'masuk'
+                  ? 'bg-white text-red-700 shadow-2xs'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              Masuk
+            </button>
+            <button
+              type="button"
+              onClick={() => setAuthMode('daftar')}
+              className={`px-2.5 py-1 rounded-md transition-colors ${
+                authMode === 'daftar'
+                  ? 'bg-white text-emerald-800 shadow-2xs'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              Daftar Baru
+            </button>
+          </div>
+        </div>
+
+        {/* Form Mode Masuk (Tanpa Autentikasi WhatsApp) */}
+        {authMode === 'masuk' && (
+          <div className="space-y-2.5">
+            <div>
+              <label className="text-[10px] font-bold text-slate-700 block mb-1">
+                Nomor WhatsApp / ID Akun Terdaftar
+              </label>
+              <div className="flex items-center rounded-xl border border-slate-300 focus-within:border-red-600 focus-within:ring-1 focus-within:ring-red-500 overflow-hidden bg-slate-50/50">
+                <span className="px-2.5 py-2 text-xs font-bold text-slate-600 bg-slate-100 border-r border-slate-200 flex items-center gap-1">
+                  <span>🇮🇩</span> +62
+                </span>
+                <input
+                  type="tel"
+                  value={loginPhone}
+                  onChange={(e) => setLoginPhone(e.target.value)}
+                  placeholder="812-3456-7890"
+                  className="flex-1 px-3 py-2 text-xs font-bold text-slate-800 focus:outline-hidden bg-transparent"
+                />
+              </div>
+            </div>
+
+            {/* Peran Masuk */}
+            <div>
+              <label className="text-[10px] font-bold text-slate-700 block mb-1">
+                Pilih Profil Akses:
+              </label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {[
+                  { role: 'pelanggan' as AppRole, label: 'Warga / Beli', icon: User },
+                  { role: 'mitra' as AppRole, label: 'Mitra Becak', icon: Bike },
+                  { role: 'merchant' as AppRole, label: 'Kios Pasar', icon: Store },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  const isSelected = loginRole === item.role;
+                  return (
+                    <button
+                      key={item.role}
+                      type="button"
+                      onClick={() => setLoginRole(item.role)}
+                      className={`py-1.5 px-1 rounded-xl text-[10px] font-bold border flex flex-col items-center gap-1 transition-all ${
+                        isSelected
+                          ? 'border-red-600 bg-red-50/80 text-red-900 shadow-2xs ring-1 ring-red-500'
+                          : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      <Icon size={14} className={isSelected ? 'text-red-600' : 'text-slate-500'} />
+                      <span className="truncate">{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {loginError && (
+              <div className="p-2 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-1.5">
+                <AlertCircle size={13} className="shrink-0" />
+                <span>{loginError}</span>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={handleDirectLogin}
+              disabled={isLoggingIn}
+              className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-red-600/20 active:scale-[0.99] transition-all cursor-pointer"
+            >
+              {isLoggingIn ? (
+                <>
+                  <RefreshCw size={14} className="animate-spin" />
+                  <span>Memproses Masuk...</span>
+                </>
+              ) : (
+                <>
+                  <LogIn size={14} />
+                  <span>Masuk ke Akun Sekarang (Langsung)</span>
+                </>
+              )}
+            </button>
+            <p className="text-[9px] text-center text-slate-400">
+              ✓ Masuk langsung tanpa verifikasi WhatsApp OTP
+            </p>
+          </div>
+        )}
+
+        {/* Form Mode Daftar Baru (Dengan Verifikasi WhatsApp) */}
+        {authMode === 'daftar' && (
+          <div className="space-y-2">
+            <div>
+              <label className="text-[10px] font-bold text-slate-700 block mb-0.5">
+                Nama Lengkap Sesuai KTP
+              </label>
+              <input
+                type="text"
+                value={registerName}
+                onChange={(e) => setRegisterName(e.target.value)}
+                placeholder="Contoh: Budi Santoso"
+                className="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 text-xs text-slate-800 focus:border-emerald-500 focus:outline-hidden"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[10px] font-bold text-slate-700 block mb-0.5">
+                  Nomor WhatsApp
+                </label>
+                <input
+                  type="tel"
+                  value={whatsappPhone}
+                  onChange={(e) => setWhatsappPhone(e.target.value)}
+                  placeholder="0812xxxx"
+                  className="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 text-xs text-slate-800 focus:border-emerald-500 focus:outline-hidden"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-700 block mb-0.5">
+                  Daftar Sebagai Peran
+                </label>
+                <select
+                  value={registerRole}
+                  onChange={(e) => setRegisterRole(e.target.value as AppRole)}
+                  className="w-full px-2 py-1.5 rounded-xl border border-slate-300 text-xs font-semibold text-slate-800 focus:border-emerald-500 focus:outline-hidden bg-white"
+                >
+                  <option value="pelanggan">Warga / Pelanggan</option>
+                  <option value="mitra">Mitra Driver / Becak</option>
+                  <option value="merchant">Merchant / Kios Pasar</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-slate-700 block mb-0.5">
+                Alamat Blok & RT/RW di Arjawinangun
+              </label>
+              <input
+                type="text"
+                value={registerRtRw}
+                onChange={(e) => setRegisterRtRw(e.target.value)}
+                placeholder="Contoh: RT 03 / RW 02 Blok Makmur"
+                className="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 text-xs text-slate-800 focus:border-emerald-500 focus:outline-hidden"
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => handleSendOtp()}
+              disabled={isVerifyingOtp}
+              className="w-full mt-1 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20 active:scale-[0.99] transition-all cursor-pointer"
+            >
+              <CheckCircle2 size={14} />
+              <span>{isVerifyingOtp ? 'Memproses...' : 'Daftar & Kirim OTP WhatsApp'}</span>
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* 3. OPSI MASUK CEPAT DENGAN AKUN TERVERIFIKASI (DEMO SATU-KLIK) */}
+      <div className="space-y-1.5 mb-2.5 text-left">
+        <div className="flex items-center justify-between px-1">
+          <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">
+            Atau Pilih Akun Demo Warga (1-Klik):
+          </span>
+          <span className="text-[9px] text-slate-500">Masuk Langsung</span>
+        </div>
+
+        <div className="grid grid-cols-3 gap-1.5">
+          {publicAccounts.map((item) => (
+            <button
+              key={item.role}
+              type="button"
+              onClick={() => handleQuickDemoSelect(item.role, item.phone)}
+              className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-all flex flex-col items-center text-center shadow-2xs group active:scale-[0.98] cursor-pointer"
+            >
+              <div className={`w-8 h-8 rounded-full overflow-hidden border-2 ${item.avatarBorder} mb-1`}>
+                <img
+                  src={item.user.avatar}
+                  alt={item.user.name}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <span className="text-[10px] font-extrabold text-slate-900 truncate w-full">
+                {item.user.name.split(' ')[0]}
+              </span>
+              <span className={`text-[8px] font-bold px-1 py-0.2 rounded mt-0.5 ${item.badgeColor}`}>
+                {item.title}
+              </span>
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Location Selector Modal */}
-      {showLocationPicker && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-end justify-center p-3 sm:p-4">
-          <div className="bg-white w-full max-w-sm rounded-2xl p-4 shadow-xl border border-slate-100 animate-in fade-in slide-in-from-bottom duration-200">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div>
-                <h3 className="font-bold text-sm text-slate-900">Pilih Lokasi di Arjawinangun</h3>
-                <p className="text-[11px] text-slate-500">Pilih blok atau dusun tempat Anda tinggal</p>
+      {/* 4. TEMPAT KHUSUS: Portal Petugas Balai Desa (Admin & Super Admin) */}
+      {onOpenAdminPortal && (
+        <div className="pt-1">
+          <button
+            type="button"
+            onClick={onOpenAdminPortal}
+            className="w-full p-2.5 rounded-2xl border border-slate-300 hover:border-purple-300 bg-slate-900 hover:bg-slate-800 text-white transition-all flex items-center justify-between shadow-xs group cursor-pointer"
+          >
+            <div className="flex items-center gap-2 text-left">
+              <div className="w-7 h-7 rounded-xl bg-purple-600/40 border border-purple-400/40 text-amber-300 flex items-center justify-center shrink-0">
+                <Lock size={13} />
               </div>
-              <button
-                type="button"
-                onClick={() => setShowLocationPicker(false)}
-                className="text-xs text-slate-400 hover:text-slate-700 p-1"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="mt-3 max-h-60 overflow-y-auto space-y-1.5">
-              {MOCK_LOCATIONS.map((loc) => (
-                <button
-                  key={loc.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedLocation(loc);
-                    setShowLocationPicker(false);
-                  }}
-                  className={`w-full p-2.5 rounded-xl text-left flex items-center justify-between text-xs transition-colors ${
-                    selectedLocation.id === loc.id
-                      ? 'bg-red-50 text-red-800 font-semibold'
-                      : 'hover:bg-slate-50 text-slate-700'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <MapPin size={14} className={selectedLocation.id === loc.id ? 'text-red-600' : 'text-slate-400'} />
-                    <div>
-                      <p className="font-medium">{loc.name}</p>
-                      <p className="text-[10px] text-slate-500">{loc.detail}</p>
-                    </div>
-                  </div>
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-slate-100 text-slate-600">
-                    {loc.tag}
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-white group-hover:text-purple-200">
+                    Portal Khusus Petugas Balai Desa
                   </span>
-                </button>
-              ))}
+                  <span className="text-[9px] bg-purple-950 text-purple-300 border border-purple-500/40 px-1 py-0.2 rounded font-bold">
+                    Khusus
+                  </span>
+                </div>
+                <p className="text-[9px] text-slate-400">
+                  Login Kuwu (Super Admin) & Admin Operasional
+                </p>
+              </div>
             </div>
-          </div>
+            <ChevronRight size={14} className="text-slate-400 group-hover:text-purple-300 shrink-0 ml-2" />
+          </button>
         </div>
       )}
 
-      {/* Simple Auth Modal (Masuk / Daftar) */}
-      {authModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-end justify-center p-3 sm:p-4">
-          <div className="bg-white w-full max-w-sm rounded-2xl p-5 shadow-xl border border-slate-100 animate-in fade-in slide-in-from-bottom duration-200">
+      {/* MODAL VERIFIKASI KODE OTP WHATSAPP */}
+      {showOtpModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-5 max-w-sm w-full text-left shadow-2xl border border-slate-100 animate-in zoom-in-95">
+            {/* Header Modal */}
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div>
-                <h3 className="font-bold text-base text-slate-900">
-                  {authModal === 'login' ? 'Masuk ke Wong Arjawinangun' : 'Daftar Akun Baru'}
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Peran: <strong className="text-red-700 capitalize">{selectedRole}</strong>
-                </p>
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shadow-md shadow-emerald-500/20">
+                  <MessageCircle size={18} />
+                </div>
+                <div>
+                  <h3 className="font-black text-sm text-slate-900">
+                    Verifikasi WhatsApp
+                  </h3>
+                  <span className="text-[10px] text-slate-500">
+                    Balai Desa Arjawinangun
+                  </span>
+                </div>
               </div>
               <button
                 type="button"
-                onClick={() => setAuthModal(null)}
-                className="text-xs text-slate-400 hover:text-slate-700 p-1"
+                onClick={() => setShowOtpModal(false)}
+                className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center"
               >
-                ✕
+                <X size={15} />
               </button>
             </div>
 
-            <div className="mt-4 space-y-3">
-              {authModal === 'register' && (
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Nama Lengkap</label>
-                  <input
-                    type="text"
-                    value={nameInput}
-                    onChange={(e) => setNameInput(e.target.value)}
-                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                    placeholder="Contoh: Ageng Prasetyo"
-                  />
-                </div>
-              )}
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Nomor WhatsApp / HP</label>
-                <input
-                  type="tel"
-                  value={phoneInput}
-                  onChange={(e) => setPhoneInput(e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                  placeholder="0812-XXXX-XXXX"
-                />
+            {/* Simulated WhatsApp Notification Box */}
+            <div className="my-3 p-3 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 shadow-2xs">
+              <div className="flex items-center justify-between pb-1 text-[10px] text-emerald-800 font-bold">
+                <span className="flex items-center gap-1">
+                  <span>💬</span> Pesan WhatsApp Balai Desa:
+                </span>
+                <span className="text-emerald-600 font-normal">Baru saja</span>
               </div>
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Kata Sandi</label>
-                <input
-                  type="password"
-                  defaultValue="••••••••"
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                />
-              </div>
-
-              <div className="pt-2">
+              <p className="text-xs text-slate-700 leading-relaxed">
+                Kode OTP Pendaftaran Anda adalah:{' '}
+                <strong className="text-emerald-700 text-sm tracking-wider font-mono font-black bg-white px-1.5 py-0.5 rounded border border-emerald-300">
+                  {receivedOtpPreview || '829104'}
+                </strong>
+              </p>
+              <div className="mt-2 flex items-center justify-between pt-1 border-t border-emerald-200/60">
+                <span className="text-[9px] text-emerald-700">Berlaku selama 5 menit</span>
                 <button
                   type="button"
-                  onClick={() => {
-                    setAuthModal(null);
-                    handleStart();
-                  }}
-                  className="w-full py-3 rounded-xl font-bold text-xs text-white bg-red-600 hover:bg-red-700 active:scale-[0.98] transition-all shadow-sm"
+                  onClick={() => setOtpCode(receivedOtpPreview || '829104')}
+                  className="text-[10px] font-bold text-emerald-800 hover:text-emerald-950 bg-white px-2 py-0.5 rounded-lg border border-emerald-300 shadow-2xs flex items-center gap-1 cursor-pointer"
                 >
-                  {authModal === 'login' ? 'Masuk Sekarang' : 'Daftar & Lanjutkan'}
+                  <Copy size={11} />
+                  <span>Isi Otomatis</span>
                 </button>
+              </div>
+            </div>
+
+            {/* Input OTP */}
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-slate-700 block">
+                Masukkan 6-Digit Kode Verifikasi:
+              </label>
+              <input
+                type="text"
+                maxLength={6}
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, ''))}
+                placeholder="Contoh: 829104"
+                className="w-full text-center text-xl font-mono font-black tracking-widest py-2.5 px-3 rounded-2xl border-2 border-emerald-500 focus:ring-2 focus:ring-emerald-400 focus:outline-hidden bg-slate-50"
+              />
+              <p className="text-[10px] text-slate-400 text-center">
+                Kode dikirimkan ke nomor WhatsApp: <strong>{whatsappPhone}</strong>
+              </p>
+            </div>
+
+            {otpError && (
+              <div className="mt-2 p-2 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-1.5">
+                <AlertCircle size={13} className="shrink-0" />
+                <span>{otpError}</span>
+              </div>
+            )}
+
+            {otpSuccessNotice && (
+              <div className="mt-2 p-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold flex items-center gap-1.5">
+                <CheckCircle2 size={13} className="shrink-0" />
+                <span>{otpSuccessNotice}</span>
+              </div>
+            )}
+
+            {/* Buttons */}
+            <div className="mt-4 space-y-2">
+              <button
+                type="button"
+                onClick={handleVerifyOtp}
+                disabled={isVerifyingOtp}
+                className="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20 active:scale-[0.99] transition-all cursor-pointer"
+              >
+                {isVerifyingOtp ? (
+                  <>
+                    <RefreshCw size={14} className="animate-spin" />
+                    <span>Memverifikasi...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 size={14} />
+                    <span>Verifikasi & Masuk Aplikasi</span>
+                  </>
+                )}
+              </button>
+
+              <div className="flex items-center justify-between text-[10px] pt-1">
+                <span className="text-slate-400">Belum menerima pesan?</span>
+                {otpCountdown > 0 ? (
+                  <span className="text-slate-500 font-semibold flex items-center gap-1">
+                    <Clock size={11} />
+                    <span>Kirim ulang ({otpCountdown}s)</span>
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleSendOtp()}
+                    className="text-emerald-700 font-bold hover:underline"
+                  >
+                    Kirim Ulang Kode WA
+                  </button>
+                )}
               </div>
             </div>
           </div>
