@@ -1,8 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { LocationItem, DriverVehicle, DriverInfo, ChatMessage } from '../../types';
 import { MOCK_LOCATIONS, VEHICLE_OPTIONS, MOCK_DRIVERS, APP_IMAGES } from '../../data/mockData';
 import { api } from '../../services/api';
-import { requestDeviceLocation } from '../../services/locationService';
+import {
+  requestDeviceLocation,
+  watchDeviceLocation,
+  calculateRouteDistanceKm,
+  calculateDistancePrice,
+  DeviceLocationResult,
+} from '../../services/locationService';
 import {
   ArrowLeft,
   MapPin,
@@ -14,7 +20,7 @@ import {
   Send,
   Sparkles,
   RotateCcw,
-  RefreshCw
+  RefreshCw,
 } from 'lucide-react';
 
 interface OjekBecakFlowProps {
@@ -22,6 +28,19 @@ interface OjekBecakFlowProps {
   onBack: () => void;
   isWireframe?: boolean;
 }
+
+const DEFAULT_DRIVER: DriverInfo = {
+  id: 'drv-default',
+  name: 'Mang Duloh',
+  phone: '0812-3456-7890',
+  vehicleType: 'Becak Onthel & Ojek Desa',
+  plateOrNumber: 'paguyuban-14',
+  rating: 4.95,
+  completedTrips: 142,
+  avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+  locationNear: 'Blok Makmur',
+  isVerified: true,
+};
 
 export const OjekBecakFlow: React.FC<OjekBecakFlowProps> = ({
   currentLocation,
@@ -35,8 +54,18 @@ export const OjekBecakFlow: React.FC<OjekBecakFlowProps> = ({
   const [destination, setDestination] = useState<LocationItem>(MOCK_LOCATIONS[1]); // Pasar Jungjang
   const [selectedVehicle, setSelectedVehicle] = useState<DriverVehicle>(VEHICLE_OPTIONS[0]); // Becak Onthel
   const [paymentMethod, setPaymentMethod] = useState<'tunai' | 'qris'>('tunai');
-  const [activeDriver, setActiveDriver] = useState<DriverInfo>(MOCK_DRIVERS.becak_onthel);
+  const [activeDriver, setActiveDriver] = useState<DriverInfo>(
+    MOCK_DRIVERS?.becak_onthel || DEFAULT_DRIVER
+  );
   const [gpsLoading, setGpsLoading] = useState(false);
+  const [realtimeGps, setRealtimeGps] = useState<DeviceLocationResult | null>(() => {
+    try {
+      const saved = localStorage.getItem('wong_arjawinangun_gps_location');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
   const [availableVehicles, setAvailableVehicles] = useState<DriverVehicle[]>(VEHICLE_OPTIONS);
 
   useEffect(() => {
@@ -47,10 +76,25 @@ export const OjekBecakFlow: React.FC<OjekBecakFlowProps> = ({
     }).catch(() => {});
   }, []);
 
+  // Sambungkan lokasi realtime dari HP pengguna secara otomatis
+  useEffect(() => {
+    const stopWatching = watchDeviceLocation((result) => {
+      setRealtimeGps(result);
+      setPickup((prev) => {
+        if (prev.id === 'loc-gps-aktual' || prev.id === currentLocation.id) {
+          return result.matchedLocation;
+        }
+        return prev;
+      });
+    });
+    return () => stopWatching();
+  }, [currentLocation.id]);
+
   const handlePickupGps = async () => {
     setGpsLoading(true);
     try {
       const result = await requestDeviceLocation();
+      setRealtimeGps(result);
       setPickup(result.matchedLocation);
       setGpsLoading(false);
     } catch (e) {
@@ -58,33 +102,45 @@ export const OjekBecakFlow: React.FC<OjekBecakFlowProps> = ({
     }
   };
 
+  // Hitung jarak rute aktual (km) berdasarkan titik jemput (termasuk GPS realtime HP) & tujuan
+  const distanceKm = useMemo(() => {
+    return calculateRouteDistanceKm(pickup, destination);
+  }, [pickup, destination]);
+
+  // Hitung harga kendaraan yang dipilih berdasarkan jarak
+  const selectedVehiclePricing = useMemo(() => {
+    return calculateDistancePrice(selectedVehicle, distanceKm);
+  }, [selectedVehicle, distanceKm]);
+
   // Live chat messages
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     {
       id: 'm-1',
       sender: 'driver',
-      text: 'Sampun dipun tampi nggih pesenane. Kula langsung meluncur teng titik jemput.',
+      text: 'Pesanan sudah diterima ya. Saya langsung meluncur ke titik jemput.',
       time: '09:32',
     },
     {
       id: 'm-2',
       sender: 'user',
-      text: 'Nggih mang, kula nengga teng ngajeng gapura Blok Makmur nggih.',
+      text: 'Baik Pak, saya menunggu di titik jemput sesuai lokasi aplikasi ya.',
       time: '09:33',
     },
   ]);
   const [inputMessage, setInputMessage] = useState('');
 
   const quickReplies = [
-    'Mang, sampun teng pundi posisine?',
-    'Kula nengga teng ngajeng gang nggih',
-    'Bade mampir tuku es sekedap saget?',
-    'Matur kesuwun mang!',
+    'Pak, sudah di mana posisinya?',
+    'Saya menunggu di depan gang ya',
+    'Boleh mampir beli minuman sebentar?',
+    'Terima kasih banyak Pak!',
   ];
 
   const handleOrder = () => {
-    // Pick driver based on vehicle
-    const driver = MOCK_DRIVERS[selectedVehicle.id] || MOCK_DRIVERS.becak_onthel;
+    const driver = MOCK_DRIVERS?.[selectedVehicle.id] || {
+      ...DEFAULT_DRIVER,
+      vehicleType: selectedVehicle.title,
+    };
     setActiveDriver(driver);
     setStep('searching');
 
@@ -109,9 +165,9 @@ export const OjekBecakFlow: React.FC<OjekBecakFlowProps> = ({
     // Simulate driver reply
     setTimeout(() => {
       const replies = [
-        'Nggih mas, siap kulo kebut alon-alon.',
-        'Iyo iki wis cedhak pos kamling, 2 menit maning tekan.',
-        'Siap mas, tenang bae belanjaan aman neng becak.',
+        'Baik, siap saya segera menuju ke sana dengan hati-hati.',
+        'Iya ini sudah dekat pos kamling, sekitar 2 menit lagi sampai.',
+        'Siap, tenang saja belanjaan aman di kendaraan.',
       ];
       const randomReply = replies[Math.floor(Math.random() * replies.length)];
       setChatMessages((prev) => [
@@ -125,6 +181,18 @@ export const OjekBecakFlow: React.FC<OjekBecakFlowProps> = ({
       ]);
     }, 1200);
   };
+
+  // List opsi lokasi termasuk GPS Realtime HP pengguna jika aktif
+  const locationSelectOptions = useMemo(() => {
+    const gpsLoc =
+      pickup.id === 'loc-gps-aktual'
+        ? pickup
+        : realtimeGps?.matchedLocation || null;
+    if (gpsLoc) {
+      return [gpsLoc, ...MOCK_LOCATIONS.filter((l) => l.id !== gpsLoc.id)];
+    }
+    return MOCK_LOCATIONS;
+  }, [pickup, realtimeGps]);
 
   return (
     <div className={`min-h-full flex flex-col justify-between ${isWireframe ? 'bg-zinc-50' : 'bg-slate-50'}`}>
@@ -173,13 +241,13 @@ export const OjekBecakFlow: React.FC<OjekBecakFlowProps> = ({
                 </div>
                 <div>
                   <span className="text-[10px] font-extrabold uppercase text-red-700 tracking-wider">
-                    Transportasi Khas Desa
+                    Tarif Otomatis Sesuai Jarak
                   </span>
                   <h3 className="text-xs font-bold text-slate-900">
                     Becak Onthel & Ojek Langganan Warga
                   </h3>
                   <p className="text-[11px] text-slate-500">
-                    Tarif transparan, mitra paguyuban desa terpercaya.
+                    Terhubung dengan GPS realtime HP Anda. Harga dihitung otomatis per kilometer.
                   </p>
                 </div>
               </div>
@@ -187,9 +255,17 @@ export const OjekBecakFlow: React.FC<OjekBecakFlowProps> = ({
 
             {/* Route Input Box */}
             <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-2.5">
-              <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
-                Rute Perjalanan
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+                  Rute Perjalanan
+                </label>
+                {realtimeGps && (
+                  <span className="text-[9px] font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    GPS HP Realtime (±{realtimeGps.accuracy}m)
+                  </span>
+                )}
+              </div>
 
               {/* Pickup Point */}
               <div className="flex items-start gap-2.5 p-2 rounded-xl bg-slate-50 border border-slate-200/70">
@@ -198,22 +274,22 @@ export const OjekBecakFlow: React.FC<OjekBecakFlowProps> = ({
                 </div>
                 <div className="flex-1 overflow-hidden">
                   <div className="flex items-center justify-between pb-0.5">
-                    <span className="text-[10px] text-slate-400 font-semibold block">Titik Jemput:</span>
+                    <span className="text-[10px] text-slate-400 font-semibold block">Titik Jemput (Lokasi Anda):</span>
                     <button
                       type="button"
                       onClick={handlePickupGps}
                       disabled={gpsLoading}
-                      className="text-[9px] font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-100/70 hover:bg-emerald-100 px-1.5 py-0.2 rounded flex items-center gap-1 transition-colors cursor-pointer"
+                      className="text-[9px] font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-100/70 hover:bg-emerald-100 px-1.5 py-0.5 rounded flex items-center gap-1 transition-colors cursor-pointer"
                     >
                       {gpsLoading ? (
                         <>
                           <RefreshCw size={9} className="animate-spin" />
-                          <span>Mencari GPS...</span>
+                          <span>Menyambungkan GPS...</span>
                         </>
                       ) : (
                         <>
                           <Navigation size={9} />
-                          <span>Gunakan GPS Aktual</span>
+                          <span>Perbarui GPS HP</span>
                         </>
                       )}
                     </button>
@@ -221,15 +297,12 @@ export const OjekBecakFlow: React.FC<OjekBecakFlowProps> = ({
                   <select
                     value={pickup.id}
                     onChange={(e) => {
-                      const found = MOCK_LOCATIONS.find((l) => l.id === e.target.value);
+                      const found = locationSelectOptions.find((l) => l.id === e.target.value);
                       if (found) setPickup(found);
                     }}
                     className="w-full text-xs font-bold text-slate-800 bg-transparent focus:outline-none"
                   >
-                    {pickup.id === 'loc-gps-aktual' && (
-                      <option value="loc-gps-aktual">📍 {pickup.name}</option>
-                    )}
-                    {MOCK_LOCATIONS.map((l) => (
+                    {locationSelectOptions.map((l) => (
                       <option key={l.id} value={l.id}>
                         {l.name} ({l.detail})
                       </option>
@@ -262,21 +335,28 @@ export const OjekBecakFlow: React.FC<OjekBecakFlowProps> = ({
                 </div>
               </div>
 
-              <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
-                <span>Estimasi Jarak Tempuh: <strong>1.4 km</strong></span>
-                <span className="text-emerald-700 font-semibold">Jalan Desa Lancar</span>
+              <div className="flex items-center justify-between text-[11px] text-slate-600 pt-1 px-0.5">
+                <span>
+                  Jarak Tempuh Rute: <strong className="text-red-700 font-black">{distanceKm.toFixed(1)} km</strong>
+                </span>
+                <span className="text-emerald-700 font-semibold">
+                  Estimasi {selectedVehiclePricing.etaText}
+                </span>
               </div>
             </div>
 
-            {/* Vehicle Options */}
+            {/* Vehicle Options with Distance-Dependent Pricing */}
             <div>
-              <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-2">
-                Pilih Jenis Armada
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+                  Pilih Jenis Armada (Harga Sesuai Jarak {distanceKm.toFixed(1)} km)
+                </label>
+              </div>
 
               <div className="space-y-2">
-                {VEHICLE_OPTIONS.map((veh) => {
+                {availableVehicles.map((veh) => {
                   const isSelected = selectedVehicle.id === veh.id;
+                  const pricing = calculateDistancePrice(veh, distanceKm);
                   return (
                     <button
                       key={veh.id}
@@ -300,15 +380,18 @@ export const OjekBecakFlow: React.FC<OjekBecakFlowProps> = ({
                             )}
                           </div>
                           <p className="text-[10px] text-slate-500 line-clamp-1">{veh.desc}</p>
-                          <span className="text-[10px] text-slate-600 font-medium">
-                            Kapasitas: {veh.capacity} · {veh.eta}
+                          <span className="text-[10px] text-slate-600 font-medium block mt-0.5">
+                            Dasar Rp {pricing.baseFare.toLocaleString('id-ID')} + Rp {pricing.perKmRate.toLocaleString('id-ID')}/km · {pricing.etaText}
                           </span>
                         </div>
                       </div>
 
                       <div className="text-right shrink-0 pl-2">
-                        <span className="text-xs font-extrabold text-red-700 tabular-nums">
-                          Rp {veh.priceEstimate.toLocaleString('id-ID')}
+                        <span className="text-xs font-extrabold text-red-700 tabular-nums block">
+                          Rp {pricing.totalPrice.toLocaleString('id-ID')}
+                        </span>
+                        <span className="text-[9px] text-slate-400 font-semibold block">
+                          {distanceKm.toFixed(1)} km
                         </span>
                         <div className="mt-1">
                           {isSelected ? (
@@ -339,7 +422,7 @@ export const OjekBecakFlow: React.FC<OjekBecakFlowProps> = ({
                       : 'border-slate-200 text-slate-600 hover:bg-slate-50'
                   }`}
                 >
-                  💵 Tunai Pas Sampai
+                  💵 Tunai Saat Sampai
                 </button>
                 <button
                   type="button"
@@ -350,7 +433,7 @@ export const OjekBecakFlow: React.FC<OjekBecakFlowProps> = ({
                       : 'border-slate-200 text-slate-600 hover:bg-slate-50'
                   }`}
                 >
-                  📱 QRIS Dompet Wong Pay
+                  📱 QRIS Dompet Digital
                 </button>
               </div>
             </div>
@@ -373,7 +456,7 @@ export const OjekBecakFlow: React.FC<OjekBecakFlowProps> = ({
             </div>
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-50 text-red-700 text-xs font-semibold animate-pulse">
               <Clock size={14} />
-              <span>Meminta konfirmasi mitra terdekat...</span>
+              <span>Meminta konfirmasi partner terdekat...</span>
             </div>
           </div>
         )}
@@ -385,8 +468,10 @@ export const OjekBecakFlow: React.FC<OjekBecakFlowProps> = ({
             <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-2 text-emerald-800">
               <CheckCircle2 size={18} className="shrink-0 text-emerald-600" />
               <div className="text-xs">
-                <span className="font-bold">Mitra Ditemukan & Sedang Menuju ke Anda!</span>
-                <p className="text-[11px] text-emerald-700">Estimasi sampai titik jemput: 3 menit lagi</p>
+                <span className="font-bold">Partner Ditemukan & Sedang Menuju ke Anda!</span>
+                <p className="text-[11px] text-emerald-700">
+                  Estimasi sampai titik jemput: {selectedVehiclePricing.etaText}
+                </p>
               </div>
             </div>
 
@@ -415,7 +500,7 @@ export const OjekBecakFlow: React.FC<OjekBecakFlowProps> = ({
                   <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-600">
                     <span className="text-amber-500 font-bold">★ {activeDriver.rating}</span>
                     <span>·</span>
-                    <span>{activeDriver.completedTrips} tarikan sukses</span>
+                    <span>{activeDriver.completedTrips} perjalanan selesai</span>
                   </div>
                 </div>
               </div>
@@ -428,7 +513,7 @@ export const OjekBecakFlow: React.FC<OjekBecakFlowProps> = ({
                   className="py-2.5 px-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs"
                 >
                   <MessageSquare size={15} />
-                  <span>Chat Driver</span>
+                  <span>Chat Pengemudi</span>
                 </button>
                 <a
                   href={`tel:${activeDriver.phone}`}
@@ -452,13 +537,17 @@ export const OjekBecakFlow: React.FC<OjekBecakFlowProps> = ({
                 <span className="font-semibold text-slate-800 text-right">{destination.name}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500">Jarak Tempuh:</span>
+                <span className="font-bold text-slate-800">{distanceKm.toFixed(1)} km</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-100">
                 <span className="text-slate-500">Pembayaran:</span>
                 <span className="font-bold text-slate-800 capitalize">{paymentMethod}</span>
               </div>
               <div className="flex justify-between pt-1">
-                <span className="text-slate-600 font-bold">Total Tarif:</span>
+                <span className="text-slate-600 font-bold">Total Tarif ({distanceKm.toFixed(1)} km):</span>
                 <span className="font-extrabold text-red-700 text-sm">
-                  Rp {selectedVehicle.priceEstimate.toLocaleString('id-ID')}
+                  Rp {selectedVehiclePricing.totalPrice.toLocaleString('id-ID')}
                 </span>
               </div>
             </div>
@@ -500,7 +589,7 @@ export const OjekBecakFlow: React.FC<OjekBecakFlowProps> = ({
               ))}
             </div>
 
-            {/* Quick replies in local dialect */}
+            {/* Quick replies */}
             <div className="pt-2 pb-1 overflow-x-auto whitespace-nowrap flex gap-1.5 no-scrollbar">
               {quickReplies.map((qr, idx) => (
                 <button
@@ -521,7 +610,7 @@ export const OjekBecakFlow: React.FC<OjekBecakFlowProps> = ({
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                placeholder="Tulis pesan ke driver..."
+                placeholder="Tulis pesan ke pengemudi..."
                 className="flex-1 px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500"
               />
               <button
@@ -541,9 +630,11 @@ export const OjekBecakFlow: React.FC<OjekBecakFlowProps> = ({
         <div className="p-4 bg-white border-t border-slate-200">
           <div className="flex items-center justify-between mb-2">
             <div>
-              <span className="text-[10px] text-slate-500 block">Total Tarif Perjalanan:</span>
+              <span className="text-[10px] text-slate-500 block">
+                Total Tarif ({distanceKm.toFixed(1)} km):
+              </span>
               <span className="text-base font-black text-red-700 tabular-nums">
-                Rp {selectedVehicle.priceEstimate.toLocaleString('id-ID')}
+                Rp {selectedVehiclePricing.totalPrice.toLocaleString('id-ID')}
               </span>
             </div>
             <span className="text-[11px] text-slate-600 font-medium">

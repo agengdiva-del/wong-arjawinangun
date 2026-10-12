@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { LocationItem, ScreenId, AppRole, UserAccount, VillagePoll } from '../../types';
 import { APP_IMAGES, MOCK_LOCATIONS, LOCAL_SERVICES, MOCK_USERS, MOCK_VILLAGE_POLLS } from '../../data/mockData';
 import { api } from '../../services/api';
-import { requestDeviceLocation, DeviceLocationResult } from '../../services/locationService';
+import { requestDeviceLocation, watchDeviceLocation, DeviceLocationResult } from '../../services/locationService';
 import {
   Search,
   MapPin,
@@ -94,6 +94,14 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
     api.getPromos().then((data) => {
       if (data && data.length > 0) setBackendPromos(data);
     }).catch(() => {});
+  }, []);
+
+  // Pantau lokasi realtime dari HP pengguna
+  useEffect(() => {
+    const stopWatch = watchDeviceLocation((result) => {
+      setGpsResult(result);
+    });
+    return () => stopWatch();
   }, []);
 
   const handleRequestGps = async () => {
@@ -464,7 +472,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         {/* User Greeting & Switch Role Alert */}
         <div className="flex items-center justify-between mb-3 text-left">
           <div>
-            <span className="text-xs text-red-200">Sugeng rawuh,</span>
+            <span className="text-xs text-red-200">Selamat datang,</span>
             <p className="text-base font-bold text-white leading-tight">
               Halo, {activeUser.name.split(' ')[0]}!
             </p>
@@ -490,7 +498,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               onClick={() => onNavigate('mitra_dashboard')}
               className="px-2.5 py-1 rounded-full bg-amber-400 text-red-950 font-bold text-[10px] flex items-center gap-1 shadow-xs"
             >
-              <span>🚲 Mode Mitra</span>
+              <span>🚲 Mode Partner</span>
               <ArrowRight size={12} />
             </button>
           ) : userRole === 'merchant' ? (
@@ -498,7 +506,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               onClick={() => onNavigate('merchant_dashboard')}
               className="px-2.5 py-1 rounded-full bg-emerald-400 text-emerald-950 font-bold text-[10px] flex items-center gap-1 shadow-xs"
             >
-              <span>🏪 Mode Kios</span>
+              <span>🏪 Mode Lapak</span>
               <ArrowRight size={12} />
             </button>
           ) : (
@@ -649,7 +657,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 
         {/* 4-column layout (2 rows = 8 slots): 7 Layanan Teratas + 1 Slot "Lainnya" */}
         <div className="grid grid-cols-4 gap-2.5">
-          {top7Services.map((item, index) => {
+          {top7Services.map((item) => {
             const Icon = item.icon;
             const usageCount = serviceUsageMap[item.id] ?? item.defaultUsage;
             return (
@@ -658,13 +666,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 type="button"
                 onClick={(e) => handleServiceClick(item, e)}
                 className="relative flex flex-col items-center text-center p-2 rounded-xl bg-white border border-slate-100 hover:border-red-200 shadow-2xs hover:shadow-xs transition-all group active:scale-95 cursor-pointer"
-                title={`${item.title} — ${usageCount.toLocaleString('id-ID')} kali digunakan (Peringkat #${index + 1})`}
+                title={`${item.title} — ${usageCount.toLocaleString('id-ID')} kali digunakan`}
               >
-                {/* Ranking Indicator Badge */}
-                <span className="absolute top-1 left-1 text-[8px] font-black text-slate-400 bg-slate-50 px-1 py-0.2 rounded border border-slate-100">
-                  #{index + 1}
-                </span>
-
                 <div className={`w-11 h-11 rounded-xl flex items-center justify-center mb-1.5 transition-transform group-hover:scale-105 shadow-2xs ${item.bg}`}>
                   <Icon size={22} />
                 </div>
@@ -1154,7 +1157,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 
                 return (
                   <>
-                    {/* BAGIAN 1: LAYANAN DI KATEGORI "LAINNYA" (PERINGKAT #8 KE ATAS) */}
+                    {/* BAGIAN 1: LAYANAN DI KATEGORI "LAINNYA" */}
                     {filteredRemaining.length > 0 && (
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
@@ -1164,21 +1167,15 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                               Layanan di Kategori "Lainnya" ({filteredRemaining.length})
                             </h4>
                           </div>
-                          <span className="text-[10px] text-amber-700 font-bold bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
-                            Peringkat #{8} — #{ALL_VILLAGE_SERVICES.length}
-                          </span>
                         </div>
                         <p className="text-[10px] text-slate-500">
-                          Layanan berikut dapat kamu buka langsung. Frekuensinya otomatis meningkat dan akan naik ke 7 Teratas jika sering digunakan.
+                          Layanan berikut dapat kamu buka langsung. Frekuensinya otomatis meningkat dan akan naik ke Beranda Utama jika sering digunakan.
                         </p>
 
                         <div className="grid grid-cols-1 gap-2 pt-1">
                           {filteredRemaining.map((item) => {
                             const Icon = item.icon;
-                            const overallRank = sortedAllServices.findIndex((s) => s.id === item.id) + 1;
                             const usageCount = serviceUsageMap[item.id] ?? item.defaultUsage;
-                            const threshold = serviceUsageMap[top7Services[6]?.id] ?? top7Services[6]?.defaultUsage ?? 750;
-                            const diffToTop7 = Math.max(0, threshold - usageCount + 1);
 
                             return (
                               <div
@@ -1194,9 +1191,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                                       <span className="text-xs font-black text-slate-900">
                                         {item.title}
                                       </span>
-                                      <span className="text-[9px] font-extrabold bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded">
-                                        #{overallRank}
-                                      </span>
                                       <span className="text-[9px] font-bold bg-red-50 text-red-700 px-1.5 py-0.2 rounded border border-red-100">
                                         {item.category}
                                       </span>
@@ -1207,10 +1201,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                                     <div className="flex items-center gap-2 mt-1 text-[10px]">
                                       <span className="font-bold text-slate-700">
                                         🔥 {usageCount.toLocaleString('id-ID')} kali digunakan
-                                      </span>
-                                      <span className="text-slate-400">·</span>
-                                      <span className="text-amber-700 font-semibold">
-                                        Perlu +{diffToTop7}x untuk tembus 7 Teratas
                                       </span>
                                     </div>
                                   </div>
@@ -1239,28 +1229,22 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                       </div>
                     )}
 
-                    {/* BAGIAN 2: 7 LAYANAN TERATAS SAAT INI (TAMPIL DI BERANDA) */}
+                    {/* BAGIAN 2: LAYANAN UTAMA SAAT INI (TAMPIL DI BERANDA) */}
                     {filteredTop7.length > 0 && (
                       <div className="space-y-2 pt-2 border-t border-slate-200/80">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-1.5">
                             <Flame size={14} className="text-red-600 fill-red-600" />
                             <h4 className="text-xs font-black uppercase tracking-wider text-slate-800">
-                              7 Layanan Teratas (Tampil di Beranda Utama)
+                              Layanan Utama (Tampil di Beranda)
                             </h4>
                           </div>
-                          <span className="text-[10px] text-red-700 font-extrabold bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">
-                            Peringkat #1 — #7
-                          </span>
                         </div>
 
                         <div className="space-y-1.5">
                           {filteredTop7.map((item) => {
                             const Icon = item.icon;
-                            const overallRank = sortedAllServices.findIndex((s) => s.id === item.id) + 1;
                             const usageCount = serviceUsageMap[item.id] ?? item.defaultUsage;
-                            const medal =
-                              overallRank === 1 ? '🥇' : overallRank === 2 ? '🥈' : overallRank === 3 ? '🥉' : `#${overallRank}`;
 
                             return (
                               <div
@@ -1268,9 +1252,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                                 className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 hover:bg-white transition-colors flex items-center justify-between"
                               >
                                 <div className="flex items-center gap-2.5 min-w-0">
-                                  <span className="text-xs font-black w-6 text-center shrink-0">
-                                    {medal}
-                                  </span>
                                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 shadow-2xs ${item.bg}`}>
                                     <Icon size={16} />
                                   </div>

@@ -31,8 +31,9 @@ export const AdminPortalLoginScreen: React.FC<AdminPortalLoginScreenProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleLogin = (role: 'super_admin' | 'admin') => {
-    if (pinCode.length < 4) {
-      setErrorMessage('Masukkan 4 digit PIN Petugas Balai Desa.');
+    const cleanPin = pinCode.trim();
+    if (cleanPin !== '45162' && cleanPin !== '45162888') {
+      setErrorMessage('PIN Keamanan Petugas salah. Masukkan PIN keamanan petugas yang benar.');
       return;
     }
     onSelectAdminRole(role);
@@ -65,7 +66,7 @@ export const AdminPortalLoginScreen: React.FC<AdminPortalLoginScreenProps> = ({
             <ShieldAlert size={30} className="text-white" />
           </div>
           <h1 className="text-base font-black text-white tracking-tight">
-            Portal Khusus Petugas Balai Desa
+            Admin Login
           </h1>
           <p className="text-[11px] text-slate-400 mt-0.5">
             Kecamatan Arjawinangun · Kabupaten Cirebon
@@ -178,18 +179,19 @@ export const AdminPortalLoginScreen: React.FC<AdminPortalLoginScreenProps> = ({
               <KeyRound size={12} className="text-amber-400" />
               <span>PIN Keamanan Petugas:</span>
             </span>
-            <span className="text-[9px] text-slate-400">Minimal 4 digit</span>
+            <span className="text-[9px] text-slate-400">5 digit PIN Keamanan</span>
           </label>
 
           <input
             type="password"
+            inputMode="numeric"
             value={pinCode}
             onChange={(e) => {
-              setPinCode(e.target.value);
+              setPinCode(e.target.value.replace(/[^0-9]/g, ''));
               setErrorMessage(null);
             }}
-            placeholder="Masukkan 4-digit PIN"
-            maxLength={6}
+            placeholder="Masukkan PIN Keamanan Petugas"
+            maxLength={8}
             className="w-full px-3 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm font-mono tracking-widest text-center text-white focus:outline-none focus:border-purple-400"
           />
 

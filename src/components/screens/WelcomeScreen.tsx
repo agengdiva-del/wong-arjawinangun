@@ -85,6 +85,23 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   const [otpError, setOtpError] = useState<string | null>(null);
   const [otpSuccessNotice, setOtpSuccessNotice] = useState<string | null>(null);
 
+  // Admin Login 8-Digit PIN Lock Modal States
+  const [showAdminPinModal, setShowAdminPinModal] = useState(false);
+  const [adminGatePin, setAdminGatePin] = useState('');
+  const [adminGateError, setAdminGateError] = useState<string | null>(null);
+
+  const handleUnlockAdminPortal = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (adminGatePin.trim() === '45162888') {
+      setShowAdminPinModal(false);
+      setAdminGatePin('');
+      setAdminGateError(null);
+      if (onOpenAdminPortal) onOpenAdminPortal();
+    } else {
+      setAdminGateError('PIN Akses Admin tidak valid. Masukkan 8 digit PIN yang benar.');
+    }
+  };
+
   // OTP Timer countdown
   useEffect(() => {
     let timer: any;
@@ -240,103 +257,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
         </p>
       </div>
 
-      {/* 1. LOKASI PERANGKAT & GPS AKTUAL */}
-      <div className="bg-white rounded-2xl p-3 border border-slate-200/90 shadow-2xs text-left mb-2.5">
-        <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
-          <div className="flex items-center gap-1.5">
-            <MapPin size={14} className="text-red-600" />
-            <span className="text-xs font-bold text-slate-800">
-              Lokasi Titik Jemput / Pengantaran
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={handleRequestDeviceGps}
-            disabled={gpsLoading}
-            className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center gap-1 transition-colors cursor-pointer"
-            title="Deteksi Lokasi GPS Aktual"
-          >
-            {gpsLoading ? (
-              <>
-                <RefreshCw size={11} className="animate-spin text-emerald-600" />
-                <span>Mendeteksi...</span>
-              </>
-            ) : (
-              <>
-                <Navigation size={11} className="text-emerald-600" />
-                <span>Gunakan GPS Aktual</span>
-              </>
-            )}
-          </button>
-        </div>
-
-        <div className="pt-2 flex items-center justify-between">
-          <div className="min-w-0 pr-2">
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs font-black text-slate-900 truncate">
-                {selectedLocation.name}
-              </span>
-              {gpsResult && (
-                <span className="text-[9px] bg-emerald-600 text-white font-extrabold px-1.5 py-0.2 rounded-full shrink-0">
-                  GPS Aktif (±{gpsResult.accuracy}m)
-                </span>
-              )}
-            </div>
-            <p className="text-[10px] text-slate-500 truncate mt-0.5">
-              {selectedLocation.detail}
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setShowLocationPicker(!showLocationPicker)}
-            className="text-[10px] text-red-700 font-bold hover:underline shrink-0 px-1 py-0.5"
-          >
-            {showLocationPicker ? 'Tutup' : 'Ganti Titik'}
-          </button>
-        </div>
-
-        {gpsError && (
-          <div className="mt-2 p-1.5 bg-amber-50 border border-amber-200 rounded-lg text-[10px] text-amber-800 flex items-center gap-1.5">
-            <AlertCircle size={12} className="text-amber-600 shrink-0" />
-            <span>{gpsError}. Silakan pilih titik blok secara manual di bawah.</span>
-          </div>
-        )}
-
-        {/* Location Dropdown selector */}
-        {showLocationPicker && (
-          <div className="mt-2 pt-2 border-t border-slate-100 space-y-1 max-h-40 overflow-y-auto">
-            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-              Pilih Dusun / Blok di Arjawinangun:
-            </span>
-            {MOCK_LOCATIONS.map((loc) => (
-              <button
-                key={loc.id}
-                type="button"
-                onClick={() => {
-                  setSelectedLocation(loc);
-                  setShowLocationPicker(false);
-                }}
-                className={`w-full text-left p-1.5 rounded-lg text-[11px] flex items-center justify-between transition-colors ${
-                  selectedLocation.id === loc.id
-                    ? 'bg-red-50 text-red-800 font-bold'
-                    : 'hover:bg-slate-50 text-slate-700'
-                }`}
-              >
-                <div>
-                  <span className="block">{loc.name}</span>
-                  <span className="text-[9px] text-slate-400">{loc.detail}</span>
-                </div>
-                <span className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded font-medium">
-                  {loc.tag}
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* 2. AKSES PENGGUNA (MASUK LANGSUNG & DAFTAR WHATSAPP) */}
+      {/* 1. AKSES PENGGUNA (MASUK LANGSUNG & DAFTAR WHATSAPP) */}
       <div className="bg-white rounded-2xl p-3.5 border border-slate-200/90 shadow-2xs text-left mb-2.5">
         <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-3">
           <div className="flex items-center gap-1.5">
@@ -411,9 +332,9 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
               </label>
               <div className="grid grid-cols-3 gap-1.5">
                 {[
-                  { role: 'pelanggan' as AppRole, label: 'Warga / Beli', icon: User },
-                  { role: 'mitra' as AppRole, label: 'Mitra Becak', icon: Bike },
-                  { role: 'merchant' as AppRole, label: 'Kios Pasar', icon: Store },
+                  { role: 'pelanggan' as AppRole, label: 'Warga', icon: User },
+                  { role: 'mitra' as AppRole, label: 'Partner', icon: Bike },
+                  { role: 'merchant' as AppRole, label: 'Lapak', icon: Store },
                 ].map((item) => {
                   const Icon = item.icon;
                   const isSelected = loginRole === item.role;
@@ -506,9 +427,9 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                   onChange={(e) => setRegisterRole(e.target.value as AppRole)}
                   className="w-full px-2 py-1.5 rounded-xl border border-slate-300 text-xs font-semibold text-slate-800 focus:border-emerald-500 focus:outline-hidden bg-white"
                 >
-                  <option value="pelanggan">Warga / Pelanggan</option>
-                  <option value="mitra">Mitra Driver / Becak</option>
-                  <option value="merchant">Merchant / Kios Pasar</option>
+                  <option value="pelanggan">Warga</option>
+                  <option value="mitra">Partner</option>
+                  <option value="merchant">Lapak</option>
                 </select>
               </div>
             </div>
@@ -541,12 +462,16 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
 
       {/* 2b. Form Pendaftaran Selesai */}
 
-      {/* 4. TEMPAT KHUSUS: Portal Petugas Balai Desa (Admin & Super Admin) */}
+      {/* 4. TEMPAT KHUSUS: Admin Login (Dikunci dengan PIN 8 Digit: 45162888) */}
       {onOpenAdminPortal && (
         <div className="pt-1">
           <button
             type="button"
-            onClick={onOpenAdminPortal}
+            onClick={() => {
+              setAdminGatePin('');
+              setAdminGateError(null);
+              setShowAdminPinModal(true);
+            }}
             className="w-full p-2.5 rounded-2xl border border-slate-300 hover:border-purple-300 bg-slate-900 hover:bg-slate-800 text-white transition-all flex items-center justify-between shadow-xs group cursor-pointer"
           >
             <div className="flex items-center gap-2 text-left">
@@ -556,10 +481,10 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
               <div>
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs font-bold text-white group-hover:text-purple-200">
-                    Portal Khusus Petugas Balai Desa
+                    Admin Login
                   </span>
                   <span className="text-[9px] bg-purple-950 text-purple-300 border border-purple-500/40 px-1 py-0.2 rounded font-bold">
-                    Khusus
+                    PIN 8 Digit
                   </span>
                 </div>
                 <p className="text-[9px] text-slate-400">
@@ -569,6 +494,68 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
             </div>
             <ChevronRight size={14} className="text-slate-400 group-hover:text-purple-300 shrink-0 ml-2" />
           </button>
+        </div>
+      )}
+
+      {/* MODAL KUNCI PIN 8 DIGIT ADMIN LOGIN */}
+      {showAdminPinModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-slate-900 text-white rounded-3xl p-5 max-w-xs w-full text-left shadow-2xl border border-slate-700 animate-in zoom-in-95">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-purple-600/30 border border-purple-400/40 text-amber-300 flex items-center justify-center">
+                  <KeyRound size={16} />
+                </div>
+                <div>
+                  <h3 className="font-black text-sm text-white">Kunci Admin Login</h3>
+                  <span className="text-[10px] text-slate-400">Masukkan PIN 8 Digit</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAdminPinModal(false)}
+                className="w-7 h-7 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 flex items-center justify-center"
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            <form onSubmit={handleUnlockAdminPortal} className="mt-3 space-y-3">
+              <div>
+                <label className="text-[11px] font-bold text-slate-300 block mb-1.5">
+                  PIN Akses Admin (8 Digit):
+                </label>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={8}
+                  value={adminGatePin}
+                  onChange={(e) => {
+                    setAdminGatePin(e.target.value.replace(/[^0-9]/g, ''));
+                    setAdminGateError(null);
+                  }}
+                  placeholder="••••••••"
+                  autoFocus
+                  className="w-full text-center text-lg font-mono font-black tracking-widest py-2.5 px-3 rounded-xl border border-slate-700 bg-slate-950 text-white focus:border-purple-400 focus:outline-hidden"
+                />
+              </div>
+
+              {adminGateError && (
+                <div className="p-2 rounded-xl bg-rose-950/70 border border-rose-500/40 text-rose-300 text-[10px] font-semibold flex items-center gap-1.5">
+                  <AlertCircle size={13} className="shrink-0 text-rose-400" />
+                  <span>{adminGateError}</span>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
+              >
+                <Lock size={13} />
+                <span>Buka Admin Login</span>
+              </button>
+            </form>
+          </div>
         </div>
       )}
 

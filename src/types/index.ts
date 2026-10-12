@@ -135,6 +135,10 @@ export interface LocationItem {
   name: string;
   detail: string;
   tag: string;
+  latitude?: number;
+  longitude?: number;
+  accuracy?: number;
+  isRealtimeGps?: boolean;
 }
 
 export interface MenuItem {
@@ -154,6 +158,8 @@ export interface DriverVehicle {
   desc: string;
   capacity: string;
   priceEstimate: number;
+  baseFare?: number;
+  perKmRate?: number;
   eta: string;
   icon: string;
 }

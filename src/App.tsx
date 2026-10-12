@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { ScreenId, AppRole, LocationItem, UserAccount, VillagePoll, AppNotification } from './types';
 import { MOCK_LOCATIONS, MOCK_USERS, MOCK_VILLAGE_POLLS, MOCK_NOTIFICATIONS } from './data/mockData';
 import { api } from './services/api';
+import { watchDeviceLocation } from './services/locationService';
 import { MobileFrame } from './components/MobileFrame';
 import { WelcomeScreen } from './components/screens/WelcomeScreen';
 import { DashboardScreen } from './components/screens/DashboardScreen';
@@ -31,8 +32,30 @@ import { Trophy } from 'lucide-react';
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<ScreenId>('dashboard');
   const [userRole, setUserRole] = useState<AppRole>('pelanggan');
-  const [currentLocation, setCurrentLocation] = useState<LocationItem>(MOCK_LOCATIONS[0]); // Blok Makmur
+  const [currentLocation, setCurrentLocation] = useState<LocationItem>(() => {
+    try {
+      const savedGps = localStorage.getItem('wong_arjawinangun_gps_location');
+      if (savedGps) {
+        const parsed = JSON.parse(savedGps);
+        if (parsed?.matchedLocation) return parsed.matchedLocation;
+      }
+    } catch (e) {}
+    return MOCK_LOCATIONS[0];
+  });
   const [isWireframe, setIsWireframe] = useState<boolean>(false);
+
+  // Sambungkan lokasi realtime pada HP pengguna secara otomatis
+  useEffect(() => {
+    const stopWatching = watchDeviceLocation((result) => {
+      setCurrentLocation((prev) => {
+        if (prev.id === 'loc-gps-aktual' || prev.id === MOCK_LOCATIONS[0].id) {
+          return result.matchedLocation;
+        }
+        return prev;
+      });
+    });
+    return () => stopWatching();
+  }, []);
 
   // Synchronized User Accounts with persistent localStorage
   const [userAccounts, setUserAccounts] = useState<Record<string, UserAccount>>(() => {

@@ -32,14 +32,14 @@ export const APP_IMAGES = {
 
 // 8 Wilayah Blok / Dusun Resmi Arjawinangun
 export const MOCK_LOCATIONS: LocationItem[] = [
-  { id: 'loc-1', name: 'Blok Makmur', detail: 'Arjawinangun, Cirebon', tag: 'Rumah' },
-  { id: 'loc-2', name: 'Pasar Jungjang Arjawinangun', detail: 'Jl. Pasar Jungjang', tag: 'Pasar' },
-  { id: 'loc-3', name: 'Stasiun Arjawinangun', detail: 'Jl. Stasiun KA', tag: 'Transportasi' },
-  { id: 'loc-4', name: 'RSUD Arjawinangun', detail: 'Jl. Bypass Arjawinangun', tag: 'Kesehatan' },
-  { id: 'loc-5', name: 'Kantor Balai Desa Arjawinangun', detail: 'Jl. Ki Bagus Rangin', tag: 'Pemerintahan' },
-  { id: 'loc-6', name: 'Karangmulya', detail: 'Dusun Karangmulya, Blok Manis', tag: 'Dusun' },
-  { id: 'loc-7', name: 'Kebonturi', detail: 'Kecamatan Arjawinangun', tag: 'Desa Tetangga' },
-  { id: 'loc-8', name: 'Pasar Sandang Tegalgubug', detail: 'Jalur Pantura Arjawinangun', tag: 'Pusat Grosir' },
+  { id: 'loc-1', name: 'Blok Makmur', detail: 'Arjawinangun, Cirebon', tag: 'Rumah', latitude: -6.6450, longitude: 108.4120 },
+  { id: 'loc-2', name: 'Pasar Jungjang Arjawinangun', detail: 'Jl. Pasar Jungjang', tag: 'Pasar', latitude: -6.6432, longitude: 108.4168 },
+  { id: 'loc-3', name: 'Stasiun Arjawinangun', detail: 'Jl. Stasiun KA', tag: 'Transportasi', latitude: -6.6498, longitude: 108.4095 },
+  { id: 'loc-4', name: 'RSUD Arjawinangun', detail: 'Jl. Bypass Arjawinangun', tag: 'Kesehatan', latitude: -6.6520, longitude: 108.4230 },
+  { id: 'loc-5', name: 'Kantor Balai Desa Arjawinangun', detail: 'Jl. Ki Bagus Rangin', tag: 'Pemerintahan', latitude: -6.6468, longitude: 108.4145 },
+  { id: 'loc-6', name: 'Karangmulya', detail: 'Dusun Karangmulya, Blok Manis', tag: 'Dusun', latitude: -6.6380, longitude: 108.4110 },
+  { id: 'loc-7', name: 'Kebonturi', detail: 'Kecamatan Arjawinangun', tag: 'Desa Tetangga', latitude: -6.6510, longitude: 108.4020 },
+  { id: 'loc-8', name: 'Pasar Sandang Tegalgubug', detail: 'Jalur Pantura Arjawinangun', tag: 'Pusat Grosir', latitude: -6.6310, longitude: 108.3980 },
 ];
 
 // Opsi Armada Transportasi Desa
@@ -47,9 +47,11 @@ export const VEHICLE_OPTIONS: DriverVehicle[] = [
   {
     id: 'becak_onthel',
     title: 'Becak Onthel Tradisional',
-    desc: 'Adem, muat banyak belanjaan pasar, santai & ramah lingkungan',
+    desc: 'Nyaman, muat banyak belanjaan pasar, santai & ramah lingkungan',
     capacity: '2 Orang + Belanjaan besar',
     priceEstimate: 10000,
+    baseFare: 7000,
+    perKmRate: 3000,
     eta: '5-8 mnt jemput',
     icon: '🚲',
   },
@@ -59,6 +61,8 @@ export const VEHICLE_OPTIONS: DriverVehicle[] = [
     desc: 'Gesit lewat gang desa, cepat sampai tujuan antar blok',
     capacity: '1 Orang (Helm SNI)',
     priceEstimate: 8000,
+    baseFare: 5000,
+    perKmRate: 2500,
     eta: '3-5 mnt jemput',
     icon: '🛵',
   },
@@ -68,6 +72,8 @@ export const VEHICLE_OPTIONS: DriverVehicle[] = [
     desc: 'Kombinasi cepat & muat barang karungan / belanjaan pasar',
     capacity: '2-3 Orang + Barang',
     priceEstimate: 14000,
+    baseFare: 10000,
+    perKmRate: 3500,
     eta: '6-9 mnt jemput',
     icon: '🛺',
   },
@@ -116,20 +122,20 @@ export const VILLAGE_CONTACTS: VillageContact[] = [
 // Panduan & Bantuan Aplikasi (FAQ)
 export const FAQS = [
   {
-    q: 'Kepripun carane pesen Ojek & Becak Lokal?',
-    a: 'Pilih menu "Ojek & Becak" ing beranda. Ketik titik jemput (misal Blok Makmur) lan tujuan sampeyan. Pilih armada (Becak Onthel Rp 10.000 utawa Ojek Motor Rp 8.000). Sawise konfirmasi, sistem bakal nyambungake mitra siaga terdekat.',
+    q: 'Bagaimana cara memesan Ojek & Becak Lokal?',
+    a: 'Pilih menu "Ojek & Becak" di beranda. Pilih titik jemput (misalnya Blok Makmur) dan tujuan Anda. Pilih armada (Becak Onthel Rp 10.000 atau Ojek Motor Rp 8.000). Setelah konfirmasi, sistem akan menghubungkan Anda dengan partner siaga terdekat.',
   },
   {
-    q: 'Kepripun carane Belanja Pasar Tradisional offline tanpa ribet?',
-    a: 'Buka menu "Belanja Offline", deleng kios pedagang pasar jungjang (sayur, sembako, kuliner). Sampeyan bisa langsung hubungi pedagang utawa pesen kurir antar jemput.',
+    q: 'Bagaimana cara Belanja Pasar Tradisional offline dengan mudah?',
+    a: 'Buka menu "Belanja Offline", lihat lapak pedagang Pasar Jungjang (sayur, sembako, kuliner). Anda dapat langsung menghubungi pedagang atau memesan kurir antar jemput.',
   },
   {
-    q: 'Kepripun carane bayar? Apa kudu nganggo HP terus?',
-    a: 'Sampeyan bisa milih bayar Tunai (Cash) langsung nalika driver utawa barang wis teka, utawa nganggo Dompet Digital QRIS kanthi scan QRIS bank/e-wallet apa wae.',
+    q: 'Bagaimana cara membayar? Apakah harus menggunakan ponsel terus?',
+    a: 'Anda dapat memilih bayar Tunai (Cash) langsung saat pengemudi atau barang tiba, atau menggunakan Dompet Digital QRIS dengan memindai QRIS bank/e-wallet apa saja.',
   },
   {
-    q: 'Kepripun carane ndaftar dadi Mitra (Tukang, Becak, Ojek, Pedagang Pasar)?',
-    a: 'Ing kaca ngarep, klik tombol "Daftar Baru" banjur pilih peran "Mitra" utawa "Merchant". Akun sampeyan bakal diverifikasi dening petugas balai desa.',
+    q: 'Bagaimana cara mendaftar menjadi Partner (Tukang, Becak, Ojek) atau Lapak (Pedagang Pasar)?',
+    a: 'Di halaman masuk, klik tab "Daftar Baru" lalu pilih peran "Partner" atau "Lapak". Akun Anda akan diverifikasi oleh petugas balai desa.',
   },
 ];
 

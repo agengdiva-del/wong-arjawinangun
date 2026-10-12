@@ -51,7 +51,7 @@ export const ProfilScreen: React.FC<ProfilScreenProps> = ({
   isWireframe = false,
 }) => {
   const [activeTab, setActiveTab] = useState<'pribadi' | 'riwayat' | 'favorit' | 'pengaturan' | 'rating'>('pribadi');
-  const [language, setLanguage] = useState<'id' | 'crb'>('crb'); // crb: Cirebonan
+  const [language, setLanguage] = useState<'id' | 'crb'>('id'); // id: Bahasa Indonesia
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [selectedReceipt, setSelectedReceipt] = useState<OrderRecord | null>(null);
 
@@ -68,6 +68,9 @@ export const ProfilScreen: React.FC<ProfilScreenProps> = ({
   const [editAvatar, setEditAvatar] = useState(currentUser.avatar);
   const [saveSuccessNotice, setSaveSuccessNotice] = useState<string | null>(null);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showAdminPinModal, setShowAdminPinModal] = useState(false);
+  const [adminGatePin, setAdminGatePin] = useState('');
+  const [adminGateError, setAdminGateError] = useState<string | null>(null);
 
   // Review Submitting Modal States
   const [showReviewModal, setShowReviewModal] = useState(false);
@@ -155,19 +158,19 @@ export const ProfilScreen: React.FC<ProfilScreenProps> = ({
       text: 'Kelola Operasional Lapangan',
     },
     mitra: {
-      title: 'Mitra Warga',
+      title: 'Partner',
       screen: 'mitra_dashboard',
       badgeBg: 'bg-amber-100 text-amber-800 border-amber-200',
       text: 'Becak, Ojek & Tukang',
     },
     merchant: {
-      title: 'Merchant Kios',
+      title: 'Lapak',
       screen: 'merchant_dashboard',
       badgeBg: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-      text: 'Kios Pasar & Warung',
+      text: 'Lapak Pasar & Warung',
     },
     pelanggan: {
-      title: 'Pelanggan',
+      title: 'Warga',
       screen: 'dashboard',
       badgeBg: 'bg-red-100 text-red-800 border-red-200',
       text: 'Warga Pembeli & Pemesan',
@@ -241,9 +244,9 @@ export const ProfilScreen: React.FC<ProfilScreenProps> = ({
 
               <div className="grid grid-cols-3 gap-1.5 text-center">
                 {[
-                  { role: 'pelanggan' as AppRole, icon: User, label: 'Pelanggan / Warga', activeBg: 'bg-red-600 text-white shadow-xs' },
-                  { role: 'mitra' as AppRole, icon: Bike, label: 'Mitra Armada', activeBg: 'bg-amber-600 text-white shadow-xs' },
-                  { role: 'merchant' as AppRole, icon: Store, label: 'Merchant Kios', activeBg: 'bg-emerald-600 text-white shadow-xs' },
+                  { role: 'pelanggan' as AppRole, icon: User, label: 'Warga', activeBg: 'bg-red-600 text-white shadow-xs' },
+                  { role: 'mitra' as AppRole, icon: Bike, label: 'Partner', activeBg: 'bg-amber-600 text-white shadow-xs' },
+                  { role: 'merchant' as AppRole, icon: Store, label: 'Lapak', activeBg: 'bg-emerald-600 text-white shadow-xs' },
                 ].map((item) => {
                   const Icon = item.icon;
                   const isSelected = userRole === item.role;
@@ -270,12 +273,16 @@ export const ProfilScreen: React.FC<ProfilScreenProps> = ({
                 <div className="pt-1">
                   <button
                     type="button"
-                    onClick={() => onNavigate('admin_portal_login')}
+                    onClick={() => {
+                      setAdminGatePin('');
+                      setAdminGateError(null);
+                      setShowAdminPinModal(true);
+                    }}
                     className="w-full p-2 rounded-xl border border-dashed border-slate-300 hover:border-purple-300 bg-slate-50 hover:bg-purple-50/50 text-slate-600 hover:text-purple-900 text-[10px] font-bold flex items-center justify-between transition-colors"
                   >
                     <div className="flex items-center gap-1.5">
                       <Lock size={12} className="text-amber-500" />
-                      <span>Portal Khusus Petugas Balai Desa (Admin & Kuwu)</span>
+                      <span>Admin Login</span>
                     </div>
                     <ChevronRight size={13} className="text-slate-400" />
                   </button>
@@ -545,8 +552,8 @@ export const ProfilScreen: React.FC<ProfilScreenProps> = ({
                     onChange={(e) => setLanguage(e.target.value as any)}
                     className="p-1.5 border border-slate-200 rounded-lg text-xs font-semibold"
                   >
-                    <option value="crb">Basa Cerbonan</option>
                     <option value="id">Bahasa Indonesia</option>
+                    <option value="crb">Bahasa Cirebon</option>
                   </select>
                 </div>
 
@@ -609,7 +616,7 @@ export const ProfilScreen: React.FC<ProfilScreenProps> = ({
                     <span className="text-amber-500 font-bold">★★★★★</span>
                   </div>
                   <p className="text-[11px] text-slate-600 mt-1 italic">
-                    "Tarikan becake adem, sabar nungguin kula blanja neng pasar Jungjang. Matur kesuwun mang!"
+                    "Tarikan becaknya nyaman, sabar menunggu saya belanja di Pasar Jungjang. Terima kasih Pak!"
                   </p>
                   <span className="text-[9px] text-slate-400 mt-1 block">3 hari lalu</span>
                 </div>
@@ -620,7 +627,7 @@ export const ProfilScreen: React.FC<ProfilScreenProps> = ({
                     <span className="text-amber-500 font-bold">★★★★★</span>
                   </div>
                   <p className="text-[11px] text-slate-600 mt-1 italic">
-                    "Cepet teka, saklar langsung bener rapih. Rekomendasi pisan kanggo warga Blok Makmur."
+                    "Cepat datang, saklar langsung diperbaiki dengan rapi. Sangat direkomendasikan untuk warga Blok Makmur."
                   </p>
                   <span className="text-[9px] text-slate-400 mt-1 block">1 minggu lalu</span>
                 </div>
@@ -722,6 +729,68 @@ export const ProfilScreen: React.FC<ProfilScreenProps> = ({
                 <span>Ya, Keluar</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Admin Login 8-Digit PIN Modal */}
+      {showAdminPinModal && onNavigate && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-slate-900 text-white rounded-2xl p-5 max-w-xs w-full text-left shadow-2xl border border-slate-700 animate-in zoom-in-95">
+            <div className="flex items-center justify-between pb-2.5 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <Lock size={15} className="text-amber-400" />
+                <h3 className="font-black text-sm text-white">Admin Login</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAdminPinModal(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                <X size={15} />
+              </button>
+            </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (adminGatePin.trim() === '45162888') {
+                  setShowAdminPinModal(false);
+                  setAdminGatePin('');
+                  setAdminGateError(null);
+                  onNavigate('admin_portal_login');
+                } else {
+                  setAdminGateError('PIN 8 digit salah.');
+                }
+              }}
+              className="mt-3 space-y-3"
+            >
+              <div>
+                <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                  Masukkan PIN 8 Digit:
+                </label>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={8}
+                  value={adminGatePin}
+                  onChange={(e) => {
+                    setAdminGatePin(e.target.value.replace(/[^0-9]/g, ''));
+                    setAdminGateError(null);
+                  }}
+                  placeholder="••••••••"
+                  autoFocus
+                  className="w-full text-center text-lg font-mono font-black tracking-widest py-2 px-3 rounded-xl border border-slate-700 bg-slate-950 text-white focus:border-purple-400 focus:outline-hidden"
+                />
+              </div>
+              {adminGateError && (
+                <p className="text-[10px] text-rose-400 font-semibold">{adminGateError}</p>
+              )}
+              <button
+                type="submit"
+                className="w-full py-2.5 px-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs"
+              >
+                Buka Admin Login
+              </button>
+            </form>
           </div>
         </div>
       )}

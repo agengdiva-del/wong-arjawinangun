@@ -79,7 +79,7 @@ export const MitraDashboardScreen: React.FC<MitraDashboardScreenProps> = ({
             <div className="flex items-center gap-1.5">
               <span className={`w-2.5 h-2.5 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
               <h3 className="text-xs font-bold text-slate-900">
-                {isOnline ? 'Status: Online (Siap Nampa Order)' : 'Status: Offline (Istirahat)'}
+                {isOnline ? 'Status: Online (Siap Terima Pesanan)' : 'Status: Offline (Istirahat)'}
               </h3>
             </div>
             <p className="text-[10px] text-slate-500 mt-0.5">
@@ -129,7 +129,7 @@ export const MitraDashboardScreen: React.FC<MitraDashboardScreenProps> = ({
                   <MapPin size={12} className="text-red-600" />
                   <span>Tujuan: <strong>Pasar Jungjang Los Sayur</strong></span>
                 </div>
-                <p className="text-[10px] text-slate-500 italic">"Gawa belanjaan kranjang gede nggih mang"</p>
+                <p className="text-[10px] text-slate-500 italic">"Membawa belanjaan keranjang besar ya Pak"</p>
               </div>
 
               <div className="grid grid-cols-2 gap-2 pt-1">
