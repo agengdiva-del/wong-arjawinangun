@@ -898,28 +898,111 @@ export async function createApp() {
   });
 
   // -------------------------------------------------------------
-  // API: Login Langsung (Tanpa OTP WhatsApp untuk Tab Masuk)
+  // API: Login Langsung (HANYA PENGGUNA TERDAFTAR YANG BISA MASUK)
   // -------------------------------------------------------------
   app.post('/api/auth/login', (req: Request, res: Response) => {
     const { phoneOrUsername, role = 'pelanggan' } = req.body;
-    const cleanPhone = (phoneOrUsername || '').replace(/[^0-9+]/g, '');
+    if (!phoneOrUsername || !phoneOrUsername.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Nomor WhatsApp atau ID Warga wajib diisi.',
+      });
+    }
 
-    // Search user in dbUsers
-    let user = Object.values(dbUsers).find(
-      (u: any) =>
-        (cleanPhone && u.emailOrPhone && u.emailOrPhone.replace(/[^0-9]/g, '') === cleanPhone) ||
-        (phoneOrUsername && u.name && u.name.toLowerCase().includes(phoneOrUsername.toLowerCase()))
-    );
+    const cleanInput = phoneOrUsername.trim();
+    const cleanPhone = cleanInput.replace(/[^0-9+]/g, '');
 
+    // Cari pengguna dalam database terdaftar
+    let user: any = Object.values(dbUsers).find((u: any) => {
+      const uPhone = (u.emailOrPhone || '').replace(/[^0-9+]/g, '');
+      const matchPhone = cleanPhone && uPhone && (uPhone === cleanPhone || cleanPhone.endsWith(uPhone) || uPhone.endsWith(cleanPhone));
+      const matchName = u.name && u.name.toLowerCase() === cleanInput.toLowerCase();
+      const matchId = u.id && u.id.toLowerCase() === cleanInput.toLowerCase();
+      return matchPhone || matchName || matchId;
+    });
+
+    // TOLAK jika akun belum terdaftar
     if (!user) {
-      user = dbUsers[role] || dbUsers.pelanggan;
+      return res.status(404).json({
+        success: false,
+        message: `Akun "${cleanInput}" belum terdaftar. Silakan lakukan pendaftaran terlebih dahulu pada tab "Daftar Baru".`,
+      });
     }
 
     res.json({
       success: true,
-      message: 'Berhasil masuk ke akun',
+      message: `Selamat datang kembali, ${user.name}!`,
       user,
       token: `direct-login-token-${Date.now()}`,
+    });
+  });
+
+  // -------------------------------------------------------------
+  // API: Pendaftaran Pengguna Baru (Warga, Partner, Lapak)
+  // -------------------------------------------------------------
+  app.post('/api/auth/register', (req: Request, res: Response) => {
+    const { name, phone, role = 'pelanggan', location, rtRw, nik } = req.body;
+    if (!name || !name.trim() || !phone || !phone.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Nama lengkap dan nomor WhatsApp wajib diisi untuk pendaftaran.',
+      });
+    }
+
+    const cleanPhone = phone.trim().replace(/[^0-9+]/g, '');
+    if (cleanPhone.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: 'Format nomor WhatsApp tidak valid (minimal 8 digit).',
+      });
+    }
+
+    // Cek apakah nomor sudah pernah terdaftar
+    const existing = Object.values(dbUsers).find((u: any) => {
+      const uPhone = (u.emailOrPhone || '').replace(/[^0-9+]/g, '');
+      return uPhone && (uPhone === cleanPhone || cleanPhone.endsWith(uPhone) || uPhone.endsWith(cleanPhone));
+    });
+
+    if (existing) {
+      return res.status(400).json({
+        success: false,
+        message: `Nomor WhatsApp ${cleanPhone} sudah terdaftar atas nama "${(existing as any).name}". Silakan langsung masuk pada tab "Masuk".`,
+      });
+    }
+
+    const assignedRole = role || 'pelanggan';
+    const newUser = {
+      id: `usr-${Date.now()}`,
+      name: name.trim(),
+      role: assignedRole,
+      roleTitle: assignedRole === 'mitra' ? 'Partner Transportasi & Jasa' : assignedRole === 'merchant' ? 'Lapak Pasar Tradisional' : 'Warga Terverifikasi',
+      emailOrPhone: cleanPhone,
+      location: location || 'Blok Makmur, Arjawinangun',
+      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+      status: 'aktif',
+      description: 'Warga terdaftar resmi di ekosistem desa Arjawinangun.',
+      verifiedBadge: 'Warga Terdaftar Resmi',
+      joinedDate: 'Oktober 2026',
+      nik: nik || '320914' + Math.floor(1000000000 + Math.random() * 9000000000),
+      rtRw: rtRw || 'RT 01 / RW 01',
+      integrityRating: 5.0,
+      serviceRating: 5.0,
+      totalReviewsCount: 0,
+      reputationBadge: 'Warga Terdaftar',
+      gamificationPoints: 50, // Poin sambutan pendaftaran baru
+    };
+
+    dbUsers[newUser.id] = newUser;
+    // juga update default key role jika kosong
+    if (!dbUsers[assignedRole] || !dbUsers[assignedRole].emailOrPhone) {
+      dbUsers[assignedRole] = newUser;
+    }
+
+    res.status(201).json({
+      success: true,
+      message: `Pendaftaran berhasil! Akun "${newUser.name}" telah aktif dan terdaftar.`,
+      user: newUser,
+      token: `auth-token-${cleanPhone}-${Date.now()}`,
     });
   });
 
@@ -934,8 +1017,22 @@ export async function createApp() {
 
     // Clean phone number
     const cleanPhone = phone.replace(/[^0-9+]/g, '');
-    if (cleanPhone.length < 9) {
+    if (cleanPhone.length < 8) {
       return res.status(400).json({ success: false, message: 'Format nomor WhatsApp tidak valid' });
+    }
+
+    // Check if user exists
+    const existingUser = Object.values(dbUsers).find((u: any) => {
+      const uPhone = (u.emailOrPhone || '').replace(/[^0-9+]/g, '');
+      return uPhone && (uPhone === cleanPhone || cleanPhone.endsWith(uPhone) || uPhone.endsWith(cleanPhone));
+    });
+
+    // Jika mode adalah 'login', tolak nomor yang belum terdaftar
+    if (purpose === 'login' && !existingUser) {
+      return res.status(404).json({
+        success: false,
+        message: `Nomor ${cleanPhone} belum terdaftar. Silakan pilih tab "Daftar Baru" untuk membuat akun baru.`,
+      });
     }
 
     // Generate random 6 digit OTP (e.g. 829104)
@@ -944,16 +1041,11 @@ export async function createApp() {
 
     activeOtpSessions.set(cleanPhone, { code: otp, expiresAt, role: req.body.role });
 
-    // Check if user exists
-    const existingUser = Object.values(dbUsers).find(
-      (u: any) => u.emailOrPhone.replace(/[^0-9]/g, '') === cleanPhone.replace(/[^0-9]/g, '')
-    );
-
     res.json({
       success: true,
       message: `Kode verifikasi WhatsApp berhasil dikirim ke ${cleanPhone}`,
       phone: cleanPhone,
-      otpPreview: otp, // Returned for dev preview simulation so user sees the WhatsApp code instantly
+      otpPreview: otp,
       expiresInSeconds: 300,
       isRegistered: !!existingUser,
       existingUser: existingUser || null,

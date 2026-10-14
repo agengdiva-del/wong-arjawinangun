@@ -28,8 +28,14 @@ import {
   X,
   PlusCircle,
   MessageSquare,
-  ThumbsUp
+  ThumbsUp,
+  Trophy,
+  Vote,
+  Zap,
+  TrendingUp,
 } from 'lucide-react';
+import { LevelProgressBar } from '../gamification/LevelProgressBar';
+import { calculateLevelInfo, gamificationStorage } from '../../services/gamificationService';
 
 interface ProfilScreenProps {
   userRole: AppRole;
@@ -39,6 +45,8 @@ interface ProfilScreenProps {
   onNavigate?: (screen: ScreenId) => void;
   onBack: () => void;
   isWireframe?: boolean;
+  gamificationPoints?: number;
+  initialTab?: 'pribadi' | 'riwayat' | 'favorit' | 'pengaturan' | 'rating';
 }
 
 export const ProfilScreen: React.FC<ProfilScreenProps> = ({
@@ -49,13 +57,18 @@ export const ProfilScreen: React.FC<ProfilScreenProps> = ({
   onNavigate,
   onBack,
   isWireframe = false,
+  gamificationPoints,
+  initialTab = 'pribadi',
 }) => {
-  const [activeTab, setActiveTab] = useState<'pribadi' | 'riwayat' | 'favorit' | 'pengaturan' | 'rating'>('pribadi');
+  const [activeTab, setActiveTab] = useState<'pribadi' | 'riwayat' | 'favorit' | 'pengaturan' | 'rating'>(initialTab);
   const [language, setLanguage] = useState<'id' | 'crb'>('id'); // id: Bahasa Indonesia
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [selectedReceipt, setSelectedReceipt] = useState<OrderRecord | null>(null);
 
   const currentUser = userAccounts?.[userRole] || MOCK_USERS[userRole] || MOCK_USERS.pelanggan;
+  const activePoints = gamificationPoints !== undefined ? gamificationPoints : gamificationStorage.getPoints(currentUser.id);
+  const levelInfo = calculateLevelInfo(activePoints);
+  const gamificationHistory = gamificationStorage.getHistory(currentUser.id);
 
   // Edit Profile Modal States
   const [showEditModal, setShowEditModal] = useState(false);
@@ -229,6 +242,21 @@ export const ProfilScreen: React.FC<ProfilScreenProps> = ({
                 </span>
                 <span className="text-[10px] text-slate-400">· {roleMeta[userRole]?.text}</span>
               </div>
+
+              {/* Lencana (Badge) Level Gamifikasi Akumulasi Poin */}
+              <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between gap-1.5 flex-wrap">
+                <div className="flex items-center gap-1.5">
+                  <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full border ${levelInfo.badgeColor} shadow-2xs flex items-center gap-1`}>
+                    <span>{levelInfo.badge}</span>
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-medium">Tingkat {levelInfo.levelNumber}/4</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs font-black text-red-700 font-mono tabular-nums">
+                    ⭐ {activePoints} Poin
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -381,6 +409,11 @@ export const ProfilScreen: React.FC<ProfilScreenProps> = ({
           </div>
         </div>
 
+        {/* Visual Progress Bar Level Gamifikasi Warga */}
+        <LevelProgressBar
+          points={activePoints}
+        />
+
         {/* Tab Menus requested in Brief */}
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
           <div className="grid grid-cols-5 text-center border-b border-slate-100 p-1 bg-slate-50">
@@ -390,7 +423,7 @@ export const ProfilScreen: React.FC<ProfilScreenProps> = ({
                 activeTab === 'pribadi' ? 'bg-white text-red-700 shadow-2xs' : 'text-slate-500'
               }`}
             >
-              Data Pribadi
+              Data Diri
             </button>
             <button
               onClick={() => setActiveTab('riwayat')}
@@ -398,7 +431,7 @@ export const ProfilScreen: React.FC<ProfilScreenProps> = ({
                 activeTab === 'riwayat' ? 'bg-white text-red-700 shadow-2xs' : 'text-slate-500'
               }`}
             >
-              Riwayat
+              Aktivitas
             </button>
             <button
               onClick={() => setActiveTab('favorit')}
@@ -414,7 +447,7 @@ export const ProfilScreen: React.FC<ProfilScreenProps> = ({
                 activeTab === 'pengaturan' ? 'bg-white text-red-700 shadow-2xs' : 'text-slate-500'
               }`}
             >
-              Pengaturan
+              Setelan
             </button>
             <button
               onClick={() => setActiveTab('rating')}
@@ -467,47 +500,99 @@ export const ProfilScreen: React.FC<ProfilScreenProps> = ({
               </div>
             )}
 
-            {/* 2. RIWAYAT TRANSAKSI */}
+            {/* 2. RIWAYAT POIN GAMIFIKASI & TRANSAKSI */}
             {activeTab === 'riwayat' && (
-              <div className="space-y-2.5">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    Semua Transaksi Selesai
-                  </span>
-                  <span className="text-[10px] text-slate-500">{MOCK_ORDERS.length} Pesanan</span>
+              <div className="space-y-4">
+                {/* Riwayat Poin Gamifikasi */}
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-1.5">
+                      <Sparkles size={14} className="text-amber-500" />
+                      <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                        Riwayat Poin & Partisipasi Warga
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-bold text-red-700 bg-red-50 px-2 py-0.5 rounded-full border border-red-200/60 tabular-nums">
+                      Total {activePoints} Poin
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    {gamificationHistory.map((item) => (
+                      <div
+                        key={item.id}
+                        className="p-2.5 bg-slate-50/80 rounded-xl border border-slate-200/80 flex items-center justify-between text-left"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                          <div className="w-7 h-7 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 font-bold text-xs">
+                            {item.category === 'Aspirasi Polling' ? (
+                              <Vote size={13} />
+                            ) : item.category === 'Login Harian' ? (
+                              <Zap size={13} />
+                            ) : (
+                              <Award size={13} />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-slate-800 truncate">{item.title}</p>
+                            <p className="text-[10px] text-slate-500">
+                              {item.category} · {item.date}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <span className="text-xs font-black text-emerald-700 font-mono tabular-nums">
+                            +{item.points}
+                          </span>
+                          <span className="text-[9px] text-slate-400 block">Poin</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
-                {MOCK_ORDERS.length === 0 ? (
-                  <div className="p-8 text-center bg-slate-50/80 rounded-2xl border border-dashed border-slate-200">
-                    <span className="text-2xl block mb-1.5">📦</span>
-                    <h5 className="text-xs font-bold text-slate-800">Belum Ada Riwayat Pesanan</h5>
-                    <p className="text-[11px] text-slate-500 mt-0.5 max-w-xs mx-auto">
-                      Pesanan ojek, becak, belanja pasar, atau jasa panggilan Anda akan tercatat otomatis di sini.
-                    </p>
+                {/* Riwayat Transaksi */}
+                <div className="space-y-2.5 pt-3 border-t border-slate-200">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Semua Transaksi Selesai
+                    </span>
+                    <span className="text-[10px] text-slate-500">{MOCK_ORDERS.length} Pesanan</span>
                   </div>
-                ) : (
-                  MOCK_ORDERS.map((ord) => (
-                    <div
-                      key={ord.id}
-                      onClick={() => setSelectedReceipt(ord)}
-                      className="p-3 rounded-xl border border-slate-200/80 hover:border-red-300 hover:bg-red-50/20 transition-all cursor-pointer text-left"
-                    >
-                      <div className="flex items-center justify-between">
-                        <h4 className="text-xs font-bold text-slate-900">{ord.title}</h4>
-                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
-                          {ord.status}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 mt-0.5">{ord.subtitle}</p>
-                      <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-slate-100 text-[10px] text-slate-500">
-                        <span>{ord.date} · {ord.paymentMethod}</span>
-                        <strong className="text-red-700 text-xs tabular-nums">
-                          Rp {ord.total.toLocaleString('id-ID')}
-                        </strong>
-                      </div>
+
+                  {MOCK_ORDERS.length === 0 ? (
+                    <div className="p-6 text-center bg-slate-50/80 rounded-2xl border border-dashed border-slate-200">
+                      <span className="text-xl block mb-1">📦</span>
+                      <h5 className="text-xs font-bold text-slate-800">Belum Ada Riwayat Pesanan</h5>
+                      <p className="text-[10px] text-slate-500 mt-0.5 max-w-xs mx-auto">
+                        Pesanan ojek, becak, atau belanja pasar Anda akan tercatat otomatis di sini.
+                      </p>
                     </div>
-                  ))
-                )}
+                  ) : (
+                    MOCK_ORDERS.map((ord) => (
+                      <div
+                        key={ord.id}
+                        onClick={() => setSelectedReceipt(ord)}
+                        className="p-3 rounded-xl border border-slate-200/80 hover:border-red-300 hover:bg-red-50/20 transition-all cursor-pointer text-left"
+                      >
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-xs font-bold text-slate-900">{ord.title}</h4>
+                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+                            {ord.status}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-0.5">{ord.subtitle}</p>
+                        <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-slate-100 text-[10px] text-slate-500">
+                          <span>{ord.date} · {ord.paymentMethod}</span>
+                          <strong className="text-red-700 text-xs tabular-nums">
+                            Rp {ord.total.toLocaleString('id-ID')}
+                          </strong>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
             )}
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { HallOfFameItem, HallOfFameNomination, HallOfFameCategory } from '../../types';
-import { MOCK_HALL_OF_FAME, MOCK_HALL_OF_FAME_NOMINATIONS } from '../../data/mockData';
+import { MOCK_HALL_OF_FAME, MOCK_HALL_OF_FAME_NOMINATIONS, MOCK_USERS } from '../../data/mockData';
 import { api } from '../../services/api';
 import {
   ArrowLeft,
@@ -25,12 +25,16 @@ import {
   Bell,
   ShieldCheck,
 } from 'lucide-react';
-import { AppRole } from '../../types';
+import { AppRole, UserAccount } from '../../types';
 
 interface HallOfFameScreenProps {
   onBack: () => void;
   isWireframe?: boolean;
   userRole?: AppRole;
+  currentUser?: UserAccount;
+  activePoints?: number;
+  initialTab?: 'galeri' | 'usulan';
+  onNavigateToPolling?: () => void;
   onOpenNotifications?: () => void;
   unreadNotificationsCount?: number;
   onSimulateApproval?: (action: 'approve' | 'publish') => void;
@@ -51,12 +55,17 @@ export const HallOfFameScreen: React.FC<HallOfFameScreenProps> = ({
   onBack,
   isWireframe = false,
   userRole = 'pelanggan',
+  currentUser,
+  activePoints,
+  initialTab = 'galeri',
+  onNavigateToPolling,
   onOpenNotifications,
   unreadNotificationsCount = 0,
   onSimulateApproval,
 }) => {
   const [items, setItems] = useState<HallOfFameItem[]>(MOCK_HALL_OF_FAME);
   const [nominations, setNominations] = useState<HallOfFameNomination[]>(MOCK_HALL_OF_FAME_NOMINATIONS);
+  const [activeMainTab, setActiveMainTab] = useState<'galeri' | 'usulan'>(initialTab === 'usulan' ? 'usulan' : 'galeri');
   const [selectedCategory, setSelectedCategory] = useState<HallOfFameCategory | 'Semua' | 'Usulan Warga'>('Semua');
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
@@ -452,62 +461,95 @@ export const HallOfFameScreen: React.FC<HallOfFameScreenProps> = ({
         </div>
       </div>
 
-      {/* Category Tabs */}
-      <div className="px-4 mt-3">
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-          {CATEGORIES.map((cat) => {
-            const isActive = selectedCategory === cat.value;
-            return (
-              <button
-                key={cat.value}
-                type="button"
-                onClick={() => setSelectedCategory(cat.value)}
-                className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all border ${
-                  isActive
-                    ? 'bg-red-700 text-white border-red-800 shadow-xs'
-                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                }`}
-              >
-                <span>{cat.icon}</span>
-                <span>{cat.label}</span>
-                {cat.value === 'Usulan Warga' && (
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
-                    isActive ? 'bg-amber-300 text-red-950' : 'bg-red-100 text-red-700'
-                  }`}>
-                    {nominations.length}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+      {/* 2 Navigasi Tab Utama Hall of Fame */}
+      <div className="px-4 mt-2.5">
+        <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-200/80 rounded-2xl">
+          <button
+            type="button"
+            onClick={() => {
+              setActiveMainTab('galeri');
+              if (selectedCategory === 'Usulan Warga') {
+                setSelectedCategory('Semua');
+              }
+            }}
+            className={`py-2 px-1 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 ${
+              activeMainTab === 'galeri'
+                ? 'bg-white text-red-800 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <span>👑</span>
+            <span className="truncate">Galeri Sosok Teladan</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setActiveMainTab('usulan');
+              setSelectedCategory('Usulan Warga');
+            }}
+            className={`py-2 px-1 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 ${
+              activeMainTab === 'usulan'
+                ? 'bg-white text-purple-800 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <span>📋</span>
+            <span className="truncate">Usulan Warga ({nominations.length})</span>
+          </button>
         </div>
       </div>
 
+      {/* Category Tabs (Hanya ditampilkan di tab Galeri Tokoh) */}
+      {activeMainTab === 'galeri' && (
+        <div className="px-4 mt-3">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+            {CATEGORIES.filter((c) => c.value !== 'Usulan Warga').map((cat) => {
+              const isActive = selectedCategory === cat.value;
+              return (
+                <button
+                  key={cat.value}
+                  type="button"
+                  onClick={() => setSelectedCategory(cat.value)}
+                  className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all border ${
+                    isActive
+                      ? 'bg-red-700 text-white border-red-800 shadow-xs'
+                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  <span>{cat.icon}</span>
+                  <span>{cat.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Main Content Area */}
       <div className="px-4 mt-3 space-y-3">
-        {/* Banner Ajakan Mengusulkan Tokoh */}
-        <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">🗳️</span>
-            <div>
-              <h4 className="text-xs font-black text-amber-950">Kenal Sosok yang Menginspirasi?</h4>
-              <p className="text-[10px] text-amber-800">
-                Usulkan tetangga, pemuda, guru, atlet atau relawan di sekitar Anda.
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowNominationModal(true)}
-            className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[10px] rounded-xl shrink-0 transition-colors shadow-2xs"
-          >
-            + Usulkan Sekarang
-          </button>
-        </div>
-
-        {/* Tab "Usulan Warga" View */}
-        {selectedCategory === 'Usulan Warga' ? (
+        {activeMainTab === 'usulan' || selectedCategory === 'Usulan Warga' ? (
           <div className="space-y-3">
+            {/* Banner Ajakan Mengusulkan Tokoh */}
+            <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🗳️</span>
+                <div>
+                  <h4 className="text-xs font-black text-amber-950">Kenal Sosok yang Menginspirasi?</h4>
+                  <p className="text-[10px] text-amber-800">
+                    Usulkan tetangga, pemuda, guru, atlet atau relawan di sekitar Anda.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowNominationModal(true)}
+                className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[10px] rounded-xl shrink-0 transition-colors shadow-2xs"
+              >
+                + Usulkan Sekarang
+              </button>
+            </div>
+
             {/* Action Notice Alert */}
             {actionNotice && (
               <div className="p-3 bg-emerald-100 border border-emerald-300 text-emerald-950 rounded-2xl text-xs font-semibold flex items-center gap-2 animate-in fade-in">

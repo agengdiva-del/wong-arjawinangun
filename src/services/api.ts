@@ -57,9 +57,29 @@ async function safeFetch<T>(endpoint: string, options?: RequestInit, fallback?: 
 
 export const api = {
   // -----------------------------------------------------------
-  // Direct Login (Tanpa OTP WhatsApp untuk Tab Masuk)
+  // Direct Login (HANYA PENGGUNA TERDAFTAR YANG BISA MASUK)
   // -----------------------------------------------------------
   async directLogin(phoneOrUsername: string, role: AppRole = 'pelanggan') {
+    const cleanInput = (phoneOrUsername || '').trim();
+    const cleanPhone = cleanInput.replace(/[^0-9+]/g, '');
+
+    // Helper untuk cek akun terdaftar di penyimpanan lokal
+    const checkLocalAccount = () => {
+      let savedAccounts: Record<string, UserAccount> = MOCK_USERS;
+      try {
+        const stored = localStorage.getItem('wong_arjawinangun_user_accounts');
+        if (stored) savedAccounts = { ...MOCK_USERS, ...JSON.parse(stored) };
+      } catch (err) {}
+
+      return Object.values(savedAccounts).find((u) => {
+        const uPhone = (u.emailOrPhone || '').replace(/[^0-9+]/g, '');
+        const matchPhone = cleanPhone && uPhone && (uPhone === cleanPhone || cleanPhone.endsWith(uPhone) || uPhone.endsWith(cleanPhone));
+        const matchName = u.name && u.name.toLowerCase() === cleanInput.toLowerCase();
+        const matchId = u.id && u.id.toLowerCase() === cleanInput.toLowerCase();
+        return matchPhone || matchName || matchId;
+      });
+    };
+
     try {
       const res = await fetch(`${BASE_URL}/auth/login`, {
         method: 'POST',
@@ -67,19 +87,109 @@ export const api = {
         body: JSON.stringify({ phoneOrUsername, role }),
       });
       const data = await res.json();
-      return data;
-    } catch (e) {
-      const existing = MOCK_USERS[role] || MOCK_USERS.pelanggan;
+
+      if (data && data.success && data.user) {
+        return data;
+      }
+
+      // Jika backend gagal atau tidak menemukan, cek apakah ada di penyimpanan lokal browser
+      const localFound = checkLocalAccount();
+      if (localFound) {
+        return {
+          success: true,
+          message: `Selamat datang kembali, ${localFound.name}!`,
+          user: localFound,
+          token: `token-direct-${Date.now()}`,
+        };
+      }
+
+      return {
+        success: false,
+        message: data?.message || `Akun "${cleanInput}" belum terdaftar. Silakan lakukan pendaftaran terlebih dahulu pada tab "Daftar Baru".`,
+      };
+    } catch (e: any) {
+      // Offline fallback: verifikasi ketat terhadap akun lokal yang sudah terdaftar
+      const found = checkLocalAccount();
+
+      if (!found) {
+        return {
+          success: false,
+          message: `Akun "${cleanInput}" belum terdaftar. Hanya akun yang sudah terdaftar resmi yang bisa masuk. Silakan mendaftar pada tab "Daftar Baru".`,
+        };
+      }
+
       return {
         success: true,
-        message: 'Berhasil masuk ke akun',
-        user: {
-          ...existing,
-          emailOrPhone: phoneOrUsername || existing.emailOrPhone,
-        },
+        message: `Selamat datang kembali, ${found.name}!`,
+        user: found,
         token: `token-direct-${Date.now()}`,
       };
     }
+  },
+
+  // -----------------------------------------------------------
+  // Register User (Pendaftaran Akun Baru)
+  // -----------------------------------------------------------
+  async registerUser(userData: {
+    name: string;
+    phone: string;
+    role: AppRole;
+    location?: string;
+    rtRw?: string;
+    nik?: string;
+  }) {
+    const cleanPhone = userData.phone.replace(/[^0-9+]/g, '');
+    const newUser: UserAccount = {
+      id: `usr-${Date.now()}`,
+      name: userData.name.trim(),
+      role: userData.role,
+      roleTitle: userData.role === 'mitra' ? 'Partner Transportasi & Jasa' : userData.role === 'merchant' ? 'Lapak Pasar Tradisional' : 'Warga Terverifikasi',
+      emailOrPhone: cleanPhone,
+      location: userData.location || 'Blok Makmur, Arjawinangun',
+      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+      status: 'aktif',
+      description: 'Warga terdaftar resmi di ekosistem desa Arjawinangun.',
+      verifiedBadge: 'Warga Terdaftar Resmi',
+      joinedDate: 'Oktober 2026',
+      nik: userData.nik || '320914' + Math.floor(1000000000 + Math.random() * 9000000000),
+      rtRw: userData.rtRw || 'RT 01 / RW 01',
+      integrityRating: 5.0,
+      serviceRating: 5.0,
+      totalReviewsCount: 0,
+      reputationBadge: 'Warga Terdaftar',
+      gamificationPoints: 50,
+    };
+
+    // Selalu simpan ke localStorage agar pendaftaran permanen di sisi klien
+    try {
+      const stored = localStorage.getItem('wong_arjawinangun_user_accounts');
+      const accounts = stored ? JSON.parse(stored) : { ...MOCK_USERS };
+      accounts[newUser.id] = newUser;
+      accounts[newUser.emailOrPhone] = newUser;
+      accounts[newUser.role] = newUser;
+      localStorage.setItem('wong_arjawinangun_user_accounts', JSON.stringify(accounts));
+    } catch (err) {}
+
+    try {
+      const res = await fetch(`${BASE_URL}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData),
+      });
+      const data = await res.json();
+      if (data && data.success && data.user) {
+        return data;
+      }
+    } catch (e: any) {
+      // Backend error fallback
+    }
+
+    return {
+      success: true,
+      message: `Pendaftaran berhasil! Akun "${newUser.name}" telah aktif.`,
+      user: newUser,
+      token: `auth-token-${Date.now()}`,
+    };
   },
 
   // -----------------------------------------------------------

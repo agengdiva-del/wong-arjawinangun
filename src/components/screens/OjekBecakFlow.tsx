@@ -58,6 +58,8 @@ export const OjekBecakFlow: React.FC<OjekBecakFlowProps> = ({
     MOCK_DRIVERS?.becak_onthel || DEFAULT_DRIVER
   );
   const [gpsLoading, setGpsLoading] = useState(false);
+  const [destSearchQuery, setDestSearchQuery] = useState('');
+  const [destCategoryFilter, setDestCategoryFilter] = useState('Semua');
   const [realtimeGps, setRealtimeGps] = useState<DeviceLocationResult | null>(() => {
     try {
       const saved = localStorage.getItem('wong_arjawinangun_gps_location');
@@ -311,28 +313,113 @@ export const OjekBecakFlow: React.FC<OjekBecakFlowProps> = ({
                 </div>
               </div>
 
-              {/* Destination Point */}
-              <div className="flex items-start gap-2.5 p-2 rounded-xl bg-slate-50 border border-slate-200/70">
-                <div className="w-6 h-6 rounded-full bg-red-100 text-red-700 flex items-center justify-center shrink-0 mt-0.5">
-                  <Navigation size={14} />
+              {/* Destination Point with Extensive Arjawinangun & Jungjang Locations */}
+              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/70 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-5 h-5 rounded-full bg-red-100 text-red-700 flex items-center justify-center shrink-0">
+                      <Navigation size={12} />
+                    </div>
+                    <span className="text-[10px] text-slate-700 font-bold">
+                      Tujuan Pengantaran ({MOCK_LOCATIONS.length} Lokasi Terdaftar):
+                    </span>
+                  </div>
+                  <span className="text-[9px] text-slate-500 font-semibold">
+                    Arjawinangun & Jungjang
+                  </span>
                 </div>
-                <div className="flex-1 overflow-hidden">
-                  <span className="text-[10px] text-slate-400 font-semibold block">Tujuan Pengantaran:</span>
-                  <select
-                    value={destination.id}
-                    onChange={(e) => {
-                      const found = MOCK_LOCATIONS.find((l) => l.id === e.target.value);
-                      if (found) setDestination(found);
-                    }}
-                    className="w-full text-xs font-bold text-slate-800 bg-transparent focus:outline-none"
-                  >
-                    {MOCK_LOCATIONS.map((l) => (
+
+                {/* Quick Popular Destination Chips */}
+                <div>
+                  <span className="text-[9px] text-slate-400 font-semibold block mb-1">
+                    Tujuan Populer (1 Ketukan Cepat):
+                  </span>
+                  <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-none">
+                    {[
+                      { name: 'Pasar Jungjang', id: 'loc-2' },
+                      { name: 'Stasiun KA', id: 'loc-3' },
+                      { name: 'RSUD Arjawinangun', id: 'loc-4' },
+                      { name: 'Balai Desa Jungjang', id: 'loc-5' },
+                      { name: 'Blok Makmur', id: 'loc-1' },
+                      { name: 'Pasar Tegalgubug', id: 'loc-16' },
+                      { name: 'Sentra Empal Gentong', id: 'loc-39' },
+                      { name: 'SMPN 1', id: 'loc-10' },
+                      { name: 'SMAN 1', id: 'loc-11' },
+                    ].map((item) => {
+                      const isSelected = destination.id === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => {
+                            const found = MOCK_LOCATIONS.find((l) => l.id === item.id);
+                            if (found) setDestination(found);
+                          }}
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap transition-all border shrink-0 ${
+                            isSelected
+                              ? 'bg-red-700 text-white border-red-800 shadow-2xs'
+                              : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          {item.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Full Destination Select Dropdown */}
+                <select
+                  value={destination.id}
+                  onChange={(e) => {
+                    const found = MOCK_LOCATIONS.find((l) => l.id === e.target.value);
+                    if (found) setDestination(found);
+                  }}
+                  className="w-full p-2 text-xs font-bold text-slate-900 bg-white rounded-xl border border-slate-300 focus:border-red-600 focus:outline-none"
+                >
+                  <optgroup label="📍 Pasar & Sentra Belanja">
+                    {MOCK_LOCATIONS.filter((l) => l.tag === 'Pasar' || l.tag === 'Pusat Grosir').map((l) => (
                       <option key={l.id} value={l.id}>
-                        {l.name} ({l.detail})
+                        {l.name} - {l.detail}
                       </option>
                     ))}
-                  </select>
-                </div>
+                  </optgroup>
+                  <optgroup label="🚆 Transportasi & Terminal">
+                    {MOCK_LOCATIONS.filter((l) => l.tag === 'Transportasi').map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.name} - {l.detail}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="🏥 Kesehatan & Medis">
+                    {MOCK_LOCATIONS.filter((l) => l.tag === 'Kesehatan').map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.name} - {l.detail}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="🏡 Dusun & Pemukiman Warga">
+                    {MOCK_LOCATIONS.filter((l) => l.tag === 'Dusun' || l.tag === 'Pemukiman').map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.name} - {l.detail}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="🏫 Pendidikan & Pesantren">
+                    {MOCK_LOCATIONS.filter((l) => l.tag === 'Pendidikan').map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.name} - {l.detail}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="🏛️ Balai Desa & Fasilitas Umum">
+                    {MOCK_LOCATIONS.filter((l) => l.tag === 'Pemerintahan' || l.tag === 'Fasilitas Umum' || l.tag === 'Ibadah' || l.tag === 'Keamanan' || l.tag === 'Keuangan' || l.tag === 'Kuliner').map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.name} - {l.detail}
+                      </option>
+                    ))}
+                  </optgroup>
+                </select>
               </div>
 
               <div className="flex items-center justify-between text-[11px] text-slate-600 pt-1 px-0.5">

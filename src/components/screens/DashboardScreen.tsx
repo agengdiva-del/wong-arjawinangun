@@ -39,6 +39,8 @@ import {
   ArrowUpRight,
 } from 'lucide-react';
 import { AppNotification } from '../../types';
+import { FloatingGamificationWidget } from '../gamification/FloatingGamificationWidget';
+import { gamificationStorage } from '../../services/gamificationService';
 
 interface DashboardScreenProps {
   currentLocation: LocationItem;
@@ -51,6 +53,9 @@ interface DashboardScreenProps {
   onOpenNotifications?: () => void;
   unreadNotificationsCount?: number;
   notifications?: AppNotification[];
+  gamificationPoints?: number;
+  onAwardPoints?: (amount: number, title: string, category: any) => void;
+  onOpenLeaderboard?: () => void;
 }
 
 export const DashboardScreen: React.FC<DashboardScreenProps> = ({
@@ -64,10 +69,47 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   onOpenNotifications,
   unreadNotificationsCount = 0,
   notifications = [],
+  gamificationPoints,
+  onAwardPoints,
+  onOpenLeaderboard,
 }) => {
   const activeUser = propUser || MOCK_USERS[userRole] || MOCK_USERS.pelanggan;
   const [searchQuery, setSearchQuery] = useState('');
   const [showAllServicesModal, setShowAllServicesModal] = useState(false);
+
+  // Daily Login Bonus Gamifikasi
+  const [dailyLoginNotice, setDailyLoginNotice] = useState<string | null>(null);
+  const [hasClaimedToday, setHasClaimedToday] = useState(false);
+  const [pointsState, setPointsState] = useState<number>(() => {
+    return gamificationPoints !== undefined
+      ? gamificationPoints
+      : gamificationStorage.getPoints(activeUser.id);
+  });
+
+  useEffect(() => {
+    if (gamificationPoints !== undefined) {
+      setPointsState(gamificationPoints);
+    }
+  }, [gamificationPoints]);
+
+  // Cek & berikan poin harian otomatis saat pertama kali buka aplikasi setiap hari
+  useEffect(() => {
+    const claimRes = gamificationStorage.checkAndClaimDailyLogin(activeUser.id);
+    if (claimRes.awarded) {
+      setDailyLoginNotice(claimRes.message);
+      setHasClaimedToday(true);
+      setPointsState(claimRes.newTotal);
+      if (onAwardPoints) {
+        onAwardPoints(5, 'Bonus Login Aktivitas Harian', 'Login Harian');
+      }
+    } else {
+      const today = new Date().toISOString().slice(0, 10);
+      const last = localStorage.getItem(`wong_arjawinangun_last_daily_login_${activeUser.id}`);
+      if (last === today) {
+        setHasClaimedToday(true);
+      }
+    }
+  }, [activeUser.id]);
   const [serviceSearchQuery, setServiceSearchQuery] = useState('');
   const [serviceFilterCategory, setServiceFilterCategory] = useState<string>('Semua');
   const [serviceFeedbackToast, setServiceFeedbackToast] = useState<{ title: string; count: number; promoted?: boolean } | null>(null);
@@ -628,6 +670,46 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         </div>
       </div>
 
+      {/* Notifikasi Otomatis Login Harian Warga */}
+      {dailyLoginNotice && (
+        <div className="px-4 mt-2.5">
+          <div className="p-3 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white shadow-md border border-emerald-400/40 flex items-center justify-between text-left animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="flex items-center gap-2.5 min-w-0 pr-2">
+              <div className="w-8 h-8 rounded-xl bg-white/20 border border-white/30 flex items-center justify-center shrink-0">
+                <Sparkles size={16} className="text-amber-300" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] font-black uppercase text-emerald-200 block">
+                  Bonus Login Aktivitas (+5 Poin)
+                </span>
+                <p className="text-xs font-bold text-white truncate leading-tight">
+                  {dailyLoginNotice}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setDailyLoginNotice(null)}
+              className="p-1 rounded-lg hover:bg-white/20 text-white/80 hover:text-white shrink-0 cursor-pointer"
+              title="Tutup Notifikasi"
+            >
+              <X size={15} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Widget Gamifikasi Warga (Ukuran ~20-25% tinggi layar) */}
+      <div className="px-4 mt-2.5">
+        <FloatingGamificationWidget
+          currentUser={activeUser}
+          points={pointsState}
+          onNavigate={onNavigate}
+          onOpenLeaderboard={onOpenLeaderboard || (() => onNavigate('profil'))}
+          dailyBonusAwarded={hasClaimedToday}
+        />
+      </div>
+
       {/* Dynamic Services Grid: 7 Teratas Berdasarkan Frekuensi Penggunaan + 1 Slot "Lainnya" */}
       <div className="px-4 mt-3 text-left">
         <div className="flex items-center justify-between mb-2">
@@ -747,10 +829,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             Hall of Fame
           </h3>
           <p className="text-[10px] text-amber-100 mt-0.5 line-clamp-1">
-            Tokoh, pemuda & usulan warga
+            Papan Skor Poin & Sosok Teladan
           </p>
           <span className="inline-flex items-center gap-0.5 text-[9px] font-extrabold text-amber-200 mt-1.5 group-hover:translate-x-0.5 transition-transform">
-            <span>Usulkan Tokoh</span>
+            <span>Papan Skor & Tokoh</span>
             <ArrowRight size={10} />
           </span>
         </div>

@@ -28,9 +28,10 @@ import { TaniIkanScreen } from './components/screens/TaniIkanScreen';
 import { HallOfFameScreen } from './components/screens/HallOfFameScreen';
 import { NotificationModal } from './components/NotificationModal';
 import { Trophy } from 'lucide-react';
+import { gamificationStorage } from './services/gamificationService';
 
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState<ScreenId>('dashboard');
+  const [currentScreen, setCurrentScreen] = useState<ScreenId>('welcome');
   const [userRole, setUserRole] = useState<AppRole>('pelanggan');
   const [currentLocation, setCurrentLocation] = useState<LocationItem>(() => {
     try {
@@ -92,6 +93,38 @@ export default function App() {
 
   const [showNotificationModal, setShowNotificationModal] = useState<boolean>(false);
   const [toastNotif, setToastNotif] = useState<AppNotification | null>(null);
+
+  // Gamifikasi Warga Poin
+  const [gamificationPoints, setGamificationPoints] = useState<number>(() => {
+    return gamificationStorage.getPoints('usr-pelanggan');
+  });
+  const [profilInitialTab, setProfilInitialTab] = useState<
+    'pribadi' | 'riwayat' | 'favorit' | 'pengaturan' | 'rating'
+  >('pribadi');
+  const [hallOfFameInitialTab, setHallOfFameInitialTab] = useState<'galeri' | 'usulan'>('galeri');
+
+  const handleAwardPoints = (
+    amount: number,
+    title: string,
+    category: 'Login Harian' | 'Aspirasi Polling' | 'Kegiatan Desa' | 'Donasi Sosial' | 'Ulasan Layanan'
+  ) => {
+    const res = gamificationStorage.addPoints(currentUser.id, amount, title, category);
+    setGamificationPoints(res.newPoints);
+
+    // Kirim notifikasi toast dan in-app
+    const rewardNotif: AppNotification = {
+      id: `notif-reward-${Date.now()}`,
+      type: 'poll_voted' as any,
+      title: `+${amount} Poin Gamifikasi! 🎉`,
+      message: `${title} (${res.levelInfo.badge})`,
+      timestamp: 'Baru saja',
+      read: false,
+      category: 'Gamifikasi',
+    };
+    setNotifications((prev) => [rewardNotif, ...prev]);
+    setToastNotif(rewardNotif);
+    setTimeout(() => setToastNotif(null), 4500);
+  };
 
   // Sync notifications to localStorage
   useEffect(() => {
@@ -203,6 +236,11 @@ export default function App() {
   };
 
   const handleVotePoll = async (pollId: string, optionId: string) => {
+    // Berikan poin gamifikasi untuk warga yang aktif memberikan aspirasi (+15 Poin)
+    const pollItem = polls.find((p) => p.id === pollId);
+    const pollTitle = pollItem?.title || 'Aspirasi Warga Desa';
+    handleAwardPoints(15, `Aspirasi Polling: ${pollTitle}`, 'Aspirasi Polling');
+
     setPolls((prev) => {
       const updated = prev.map((p) => {
         if (p.id !== pollId) return p;
@@ -343,6 +381,12 @@ export default function App() {
           onOpenNotifications={() => setShowNotificationModal(true)}
           unreadNotificationsCount={unreadNotificationsCount}
           notifications={notifications}
+          gamificationPoints={gamificationPoints}
+          onAwardPoints={handleAwardPoints}
+          onOpenLeaderboard={() => {
+            setHallOfFameInitialTab('galeri');
+            setCurrentScreen('hall_of_fame');
+          }}
         />
       )}
 
@@ -399,12 +443,16 @@ export default function App() {
         />
       )}
 
-      {/* 4f. Hall of Fame Arjawinangun (Panggung Kehormatan & Usulan Warga) */}
+      {/* 4f. Hall of Fame Arjawinangun (Panggung Kehormatan, Papan Skor Warga & Usulan) */}
       {currentScreen === 'hall_of_fame' && (
         <HallOfFameScreen
           onBack={() => setCurrentScreen('dashboard')}
           isWireframe={isWireframe}
           userRole={userRole}
+          currentUser={currentUser}
+          activePoints={gamificationPoints}
+          initialTab={hallOfFameInitialTab}
+          onNavigateToPolling={() => setCurrentScreen('polling')}
           onOpenNotifications={() => setShowNotificationModal(true)}
           unreadNotificationsCount={unreadNotificationsCount}
           onSimulateApproval={handleSimulateApproval}
@@ -429,6 +477,8 @@ export default function App() {
           onNavigate={setCurrentScreen}
           onBack={() => setCurrentScreen('dashboard')}
           isWireframe={isWireframe}
+          gamificationPoints={gamificationPoints}
+          initialTab={profilInitialTab}
         />
       )}
 

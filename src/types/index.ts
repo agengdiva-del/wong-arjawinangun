@@ -40,6 +40,34 @@ export interface UserAccount {
   serviceRating: number;   // e.g. 4.90
   totalReviewsCount: number;
   reputationBadge: string;
+  // Gamifikasi Warga Desa
+  gamificationPoints?: number;
+  gamificationLevel?: CitizenLevelTier;
+  gamificationHistory?: GamificationHistoryItem[];
+  lastDailyLoginDate?: string;
+}
+
+export type CitizenLevelTier = 'Warga Baru' | 'Warga Aktif' | 'Warga Teladan' | 'Tokoh Inspiratif';
+
+export interface GamificationHistoryItem {
+  id: string;
+  title: string;
+  points: number;
+  date: string;
+  category: 'Login Harian' | 'Aspirasi Polling' | 'Kegiatan Desa' | 'Donasi Sosial' | 'Ulasan Layanan';
+  icon?: string;
+}
+
+export interface CitizenLeaderboardEntry {
+  id: string;
+  name: string;
+  location: string;
+  avatar: string;
+  points: number;
+  levelTitle: CitizenLevelTier;
+  levelBadge: string;
+  isCurrentUser?: boolean;
+  rank?: number;
 }
 
 export interface PollOption {
@@ -401,7 +429,7 @@ export interface AppNotification {
   message: string;
   timestamp: string;
   read: boolean;
-  category: 'Hall of Fame' | 'Info Desa' | 'Layanan';
+  category: 'Hall of Fame' | 'Info Desa' | 'Layanan' | 'Gamifikasi';
   actionLink?: {
     screen: ScreenId;
     targetId?: string;
